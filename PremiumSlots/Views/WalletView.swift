@@ -225,7 +225,7 @@ struct WalletRootView: View {
                 }
             }
 
-            Section("Add funds") {
+            Section {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(denominations, id: \.self) { amount in

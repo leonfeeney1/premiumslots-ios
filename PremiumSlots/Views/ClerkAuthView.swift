@@ -117,6 +117,11 @@ struct ClerkAuthView: View {
 /// HTTPCookieStorage.shared, so the Flask session cookie must be
 /// copied across after Clerk sync, and cleared from both on sign-out.
 enum ClerkSessionStore {
+    // WKWebsiteDataStore.httpCookieStore is MainActor-isolated in the
+    // Swift 6 SDK: accessing it from a nonisolated async context is a
+    // warning in Swift 5 mode and an error in Swift 6 mode, so both
+    // entry points hop to the main actor. Callers already await them.
+    @MainActor
     static func syncCookiesToSharedStorage() async throws {
         let store = WKWebsiteDataStore.default().httpCookieStore
         let cookies = await withCheckedContinuation { continuation in
@@ -131,6 +136,7 @@ enum ClerkSessionStore {
         }
     }
 
+    @MainActor
     static func clearAll() async {
         let store = WKWebsiteDataStore.default().httpCookieStore
         let cookies = await withCheckedContinuation { continuation in
