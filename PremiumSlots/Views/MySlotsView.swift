@@ -224,11 +224,13 @@ struct MySlotsView: View {
                         Text(sub.serviceRequested)
                             .psTextStyle(.headline)
                             .lineLimit(2)
-                        Text("KES \(sub.amountDue)")
-                            .psTextStyle(.headline)
-                        + Text(" · Order #\(sub.id)")
-                            .psTextStyle(.caption)
-                            .foregroundStyle(.psMuted)
+                        HStack(spacing: 0) {
+                            Text("KES \(sub.amountDue)")
+                                .psTextStyle(.headline)
+                            Text(" · Order #\(sub.id)")
+                                .psTextStyle(.caption)
+                                .foregroundStyle(.psMuted)
+                        }
                         if let locked = sub.lockedPrice, locked != sub.amountDue {
                             Text("Locked price KES \(locked)")
                                 .psTextStyle(.caption)
