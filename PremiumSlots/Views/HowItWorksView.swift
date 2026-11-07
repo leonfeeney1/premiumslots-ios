@@ -55,7 +55,7 @@ struct HowItWorksView: View {
     private func stepRow(number: String, title: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.psHeadline)
                 .foregroundStyle(.psCyan)
                 .frame(width: 32, height: 32)
                 .background(Color.psPrimarySoft)
@@ -75,7 +75,7 @@ struct HowItWorksView: View {
     private func ruleRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.psIcon)
                 .foregroundStyle(.psCyan)
                 .frame(width: 22)
                 .accessibilityHidden(true)

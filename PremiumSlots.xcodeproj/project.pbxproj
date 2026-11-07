@@ -44,6 +44,12 @@
 		62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */; };
 		EE0541BF578CCEB51672A0FA /* AdminContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B2C0990C651323460B5961E /* AdminContentView.swift */; };
 		FAB3783C6A63D77628832317 /* AdminOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */; };
+		A43D0024179D3C7BA420B267 /* APIClient+Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */; };
+		40D1D9C905AD46A4B0B06056 /* LegalText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F75C5127AD8F2792C6B8B /* LegalText.swift */; };
+		1EA10E072992285B8520DD66 /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */; };
+		0A36CE3204E315CD688C4020 /* TermsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFED49240A41FE02F54F16FA /* TermsView.swift */; };
+		3F2147FD403A0EDDEDBF75C5 /* PasskeyAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */; };
+		ADECEC1C624DEBBAD7532617 /* ReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86067DB7752941A2B1F87F1C /* ReceiptsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +76,12 @@
 		7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminWalletView.swift; sourceTree = "<group>"; };
 		6B2C0990C651323460B5961E /* AdminContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminContentView.swift; sourceTree = "<group>"; };
 		0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsView.swift; sourceTree = "<group>"; };
+		8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient+Home.swift; sourceTree = "<group>"; };
+		832F75C5127AD8F2792C6B8B /* LegalText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalText.swift; sourceTree = "<group>"; };
+		F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
+		FFED49240A41FE02F54F16FA /* TermsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsView.swift; sourceTree = "<group>"; };
+		A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyAuth.swift; sourceTree = "<group>"; };
+		86067DB7752941A2B1F87F1C /* ReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptsView.swift; sourceTree = "<group>"; };
 		2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailView.swift; sourceTree = "<group>"; };
 		2D62D1347F6783D1323CE4D2 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
 		3888DBE22CE412ACB94000D2 /* MySlotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MySlotsView.swift; sourceTree = "<group>"; };
@@ -133,6 +145,12 @@
 				7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */,
 				6B2C0990C651323460B5961E /* AdminContentView.swift */,
 				0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */,
+				8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */,
+				832F75C5127AD8F2792C6B8B /* LegalText.swift */,
+				F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */,
+				FFED49240A41FE02F54F16FA /* TermsView.swift */,
+				A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */,
+				86067DB7752941A2B1F87F1C /* ReceiptsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -273,6 +291,12 @@
 				62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */,
 				EE0541BF578CCEB51672A0FA /* AdminContentView.swift in Sources */,
 				FAB3783C6A63D77628832317 /* AdminOpsView.swift in Sources */,
+				A43D0024179D3C7BA420B267 /* APIClient+Home.swift in Sources */,
+				40D1D9C905AD46A4B0B06056 /* LegalText.swift in Sources */,
+				1EA10E072992285B8520DD66 /* PrivacyPolicyView.swift in Sources */,
+				0A36CE3204E315CD688C4020 /* TermsView.swift in Sources */,
+				3F2147FD403A0EDDEDBF75C5 /* PasskeyAuth.swift in Sources */,
+				ADECEC1C624DEBBAD7532617 /* ReceiptsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

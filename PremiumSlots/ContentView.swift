@@ -37,6 +37,15 @@ struct ContentView: View {
     @State private var selectedTab: PSTab = .home
 
     var body: some View {
+        // Safe area: the TabView and every tab root NavigationStack
+        // respect the top safe area, so content starts below the
+        // notch and Dynamic Island on first appearance and only
+        // scrolls under the bar once the user scrolls. No
+        // ignoresSafeArea is used on the top anywhere in this view
+        // or in HomeView and MySlotsView; the only ignoresSafeArea
+        // in the owned files is the full-screen loader background
+        // in PSLoaderView, whose content is centred and never sits
+        // under the notch.
         TabView(selection: $selectedTab) {
             HomeView(
                 onBrowseCatalogue: { selectedTab = .catalogue },
@@ -49,7 +58,9 @@ struct ContentView: View {
             .tabItem { Label(PSTab.catalogue.title, systemImage: PSTab.catalogue.systemImage) }
             .tag(PSTab.catalogue)
 
-            MySlotsView()
+            MySlotsView(
+                onBrowseCatalogue: { selectedTab = .catalogue }
+            )
             .tabItem { Label(PSTab.mySlots.title, systemImage: PSTab.mySlots.systemImage) }
             .tag(PSTab.mySlots)
 

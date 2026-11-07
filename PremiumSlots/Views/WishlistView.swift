@@ -13,6 +13,7 @@ struct WishlistRootView: View {
     @EnvironmentObject private var appState: AppState
     @State private var items: [WshItem] = []
     @State private var categoryCounts: [String: Int] = [:]
+    @State private var serverCategories: [String] = []
     @State private var kpis: WshKPIs?
     @State private var myVotedIds: Set<Int> = []
     @State private var myNotifyIds: Set<Int> = []
@@ -28,23 +29,40 @@ struct WishlistRootView: View {
     @State private var submitTitle = ""
     @State private var submitDescription = ""
     @State private var submitCategory = "AI Tools"
+    @State private var submitPrice = ""
     @State private var isSubmitting = false
 
-    private let categories = ["All", "AI Tools", "Streaming", "Productivity", "Developer", "Design", "Security"]
-    private let statuses = ["all", "suggested", "planned", "available"]
+    // Server categories when the list response carries them; the
+    // hardcoded list is the fallback only. Statuses include
+    // under_review: new suggestions are filed under that status by
+    // the server, so "suggested" alone never matched them.
+    private var categories: [String] {
+        serverCategories.isEmpty
+            ? ["All", "AI Tools", "Streaming", "Productivity", "Developer", "Design", "Security"]
+            : ["All"] + serverCategories
+    }
+    private let statuses = ["all", "suggested", "under_review", "planned", "available"]
     private let sorts = [("votes", "Most voted"), ("newest", "Newest"), ("price_asc", "Lowest price")]
 
     var body: some View {
         List {
             Section("Roadmap") {
                 HStack(spacing: 12) {
-                    wshKPI(value: "\(kpis?.total_items ?? 0)", label: "Items")
-                    wshKPI(value: "\(kpis?.total_votes ?? 0)", label: "Votes")
-                    wshKPI(value: "\(kpis?.planned_count ?? 0)", label: "Planned")
-                    wshKPI(value: "\(kpis?.available_count ?? 0)", label: "Available")
+                    wshKPI(value: kpis.map { "\($0.total_items ?? 0)" } ?? "–", label: "Items")
+                    wshKPI(value: kpis.map { "\($0.total_votes ?? 0)" } ?? "–", label: "Votes")
+                    wshKPI(value: kpis.map { "\($0.planned_count ?? 0)" } ?? "–", label: "Planned")
+                    wshKPI(value: kpis.map { "\($0.available_count ?? 0)" } ?? "–", label: "Available")
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+            }
+
+            if !appState.isLoggedIn {
+                Section {
+                    Text("Sign in to see the wishlist, vote and suggest new platforms.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                }
             }
 
             Section {
@@ -104,7 +122,9 @@ struct WishlistRootView: View {
             } else {
                 Section("Wishlist") {
                     ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 12) {
+                            PlatformLogoView(name: item.title, size: 44)
+                            VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text(item.title)
                                     .font(.psHeadline)
@@ -128,8 +148,8 @@ struct WishlistRootView: View {
                                         .font(.psCaption)
                                         .foregroundStyle(.psMuted)
                                 }
-                                if let price = item.price {
-                                    Text("KES \(price)")
+                                if let price = item.price, price > 0 {
+                                    Text(psKES(price))
                                         .font(.psCaption)
                                         .foregroundStyle(.psMuted)
                                 }
@@ -163,6 +183,14 @@ struct WishlistRootView: View {
                                 .buttonStyle(.bordered)
                                 .disabled(!appState.isLoggedIn)
                                 .accessibilityLabel("Notify me about \(item.title)")
+                                if myVotedIds.contains(item.id ?? -1) {
+                                    Button("Remove vote") {
+                                        Task { await vote(item) }
+                                    }
+                                    .font(.psCaption)
+                                    .accessibilityLabel("Remove vote for \(item.title)")
+                                }
+                            }
                             }
                         }
                         .psTouchTarget()
@@ -186,6 +214,10 @@ struct WishlistRootView: View {
                     .psTextField()
                     .lineLimit(3...)
                     .accessibilityLabel("Wishlist item description")
+                TextField("Estimated price in KES, optional", text: $submitPrice)
+                    .psTextField()
+                    .keyboardType(.numberPad)
+                    .accessibilityLabel("Estimated price in KES")
                 Picker("Category", selection: $submitCategory) {
                     ForEach(categories.filter { $0 != "All" }, id: \.self) { category in
                         Text(category).tag(category)
@@ -211,6 +243,7 @@ struct WishlistRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Wishlist")
         .navigationBarTitleDisplayMode(.inline)
@@ -245,20 +278,27 @@ struct WishlistRootView: View {
     }
 
     private func load() async {
+        // The list endpoint requires a signed-in session. Without
+        // this guard a signed-out visit failed with a 401 and showed
+        // a raw error instead of the sign-in prompt above.
+        guard appState.isLoggedIn else { return }
         isLoading = true
         loadError = nil
         defer { isLoading = false }
-        var query: [String] = []
-        if selectedCategory != "All" { query.append("category=\(selectedCategory)") }
-        if selectedStatus != "all" { query.append("status=\(selectedStatus)") }
-        query.append("sort=\(selectedSort)")
+        var params: [(String, String)] = []
+        if selectedCategory != "All" { params.append(("category", selectedCategory)) }
+        if selectedStatus != "all" { params.append(("status", selectedStatus)) }
+        params.append(("sort", selectedSort))
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !q.isEmpty { query.append("q=\(q)") }
-        let path = "api/v1/wishlist?" + query.joined(separator: "&")
+        if !q.isEmpty { params.append(("q", q)) }
+        let path = "api/v1/wishlist?" + psEncodedQuery(params)
         do {
             let response: WshResponse = try await APIClient.shared.fetchJSON(path)
             items = response.items
             categoryCounts = response.category_counts ?? [:]
+            if let server = response.categories, !server.isEmpty {
+                serverCategories = server
+            }
             kpis = response.kpis
             myVotedIds = Set(response.my_voted_ids ?? [])
             myNotifyIds = Set(response.my_notify_ids ?? [])
@@ -270,10 +310,25 @@ struct WishlistRootView: View {
     private func vote(_ item: WshItem) async {
         guard let id = item.id else { return }
         do {
-            let _: APIResponse = try await APIClient.shared.fetchJSON(
+            // The server vote endpoint TOGGLES: voting again removes
+            // the vote. The old code marked the item voted before the
+            // call and never read the result, so removing a vote
+            // showed the wrong state until the next reload. Trust the
+            // returned voted flag and count instead.
+            let response: WshVoteResponse = try await APIClient.shared.fetchJSON(
                 "api/v1/wishlist/vote", method: "POST", body: ["item_id": id])
-            myVotedIds.insert(id)
-            await load()
+            if response.voted == true {
+                myVotedIds.insert(id)
+            } else {
+                myVotedIds.remove(id)
+            }
+            if let index = items.firstIndex(where: { $0.id == id }),
+               let count = response.votes_count {
+                items[index].votes = count
+            }
+            actionMessage = response.voted == true
+                ? "Vote counted for \(item.title)."
+                : "Vote removed for \(item.title)."
         } catch {
             actionMessage = error.localizedDescription
         }
@@ -306,15 +361,19 @@ struct WishlistRootView: View {
         }
         isSubmitting = true
         defer { isSubmitting = false }
+        var body: [String: Any] = ["title": title,
+                   "description": submitDescription,
+                   "category": submitCategory]
+        if let price = Int(submitPrice.trimmingCharacters(in: .whitespacesAndNewlines)), price > 0 {
+            body["estimated_price"] = price
+        }
         do {
             let _: APIResponse = try await APIClient.shared.fetchJSON(
-                "api/v1/wishlist/submit", method: "POST",
-                body: ["title": title,
-                       "description": submitDescription,
-                       "category": submitCategory])
+                "api/v1/wishlist/submit", method: "POST", body: body)
             actionMessage = "Thanks. Your suggestion was added to the wishlist."
             submitTitle = ""
             submitDescription = ""
+            submitPrice = ""
             await load()
         } catch {
             actionMessage = error.localizedDescription
@@ -323,6 +382,12 @@ struct WishlistRootView: View {
 }
 
 // MARK: - Wishlist response types (keys from backend/api_v1.py)
+// The list returns the full WishlistItems row: the vote count is
+// "votes_count" and the price is "estimated_price", not "votes" and
+// "price". Reading those names left every row at 0 votes with no
+// price. There is no delete endpoint on the server: removing an
+// item means removing your vote (the vote endpoint toggles) or
+// turning its notify-me off.
 
 struct WshItem: Decodable, Identifiable {
     let id: Int?
@@ -330,8 +395,21 @@ struct WshItem: Decodable, Identifiable {
     let description: String?
     let category: String?
     let status: String?
-    let votes: Int?
-    let price: Int?
+    var votes: Int?
+    var price: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, category, status
+        case votes = "votes_count"
+        case price = "estimated_price"
+    }
+}
+
+struct WshVoteResponse: Decodable {
+    let ok: Bool
+    let action: String?
+    let voted: Bool?
+    let votes_count: Int?
 }
 
 struct WshKPIs: Decodable {
@@ -345,6 +423,7 @@ struct WshResponse: Decodable {
     let ok: Bool
     let items: [WshItem]
     let category_counts: [String: Int]?
+    let categories: [String]?
     let kpis: WshKPIs?
     let my_voted_ids: [Int]?
     let my_notify_ids: [Int]?

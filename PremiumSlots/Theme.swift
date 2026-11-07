@@ -11,8 +11,10 @@ import SwiftUI
 // in-app System / Light / Dark choice (applied at the app root with
 // .preferredColorScheme). Views must use these tokens and never a
 // hardcoded black/white background.
-// Type scale, v2/v3: headings 22pt semibold max, body 15pt,
-// captions 12pt, icons 20-24pt. No large titles anywhere.
+// Type scale, v5: one canonical set, PSTextStyle (largeTitle 28,
+// title 22, headline 17, body 15, subheadline 13, caption 12,
+// mono 13). Body text is one size (15pt) everywhere. The 28pt
+// display size is hero copy only, never a navigation title.
 // Dynamic Type is respected (all sizes are system-scaled points).
 
 extension Color {
@@ -131,19 +133,76 @@ extension ShapeStyle where Self == Color {
 }
 
 extension Font {
-    /// In-content heading, 22pt semibold. The largest type in the app.
+    /// In-content heading, 22pt semibold. The largest type used on
+    /// ordinary screens (v2 font cap: no 36pt+ type anywhere).
     static let psTitle = Font.system(size: 22, weight: .semibold, design: .default)
     static let psHeadline = Font.system(size: 17, weight: .semibold, design: .default)
     static let psBody = Font.system(size: 15, weight: .regular, design: .default)
     static let psCaption = Font.system(size: 12, weight: .regular, design: .default)
     static let psMono = Font.system(size: 13, weight: .regular, design: .monospaced)
+    /// Display size, 28pt semibold. Hero and display copy only, never
+    /// a navigation title and never above 28pt.
+    static let psLargeTitle = Font.system(size: 28, weight: .semibold, design: .default)
+    /// Secondary body copy, 13pt regular.
+    static let psSubheadline = Font.system(size: 13, weight: .regular, design: .default)
+    /// Primary button label, 16pt semibold.
+    static let psButton = Font.system(size: 16, weight: .semibold, design: .default)
+    /// Standard SF Symbol size, 20pt.
+    static let psIcon = Font.system(size: 20, weight: .regular, design: .default)
+    /// Large SF Symbol size for empty and error states, 24pt.
+    static let psIconLarge = Font.system(size: 24, weight: .regular, design: .default)
+    /// Small semibold size for chevrons, 13pt.
+    static let psIconSmall = Font.system(size: 13, weight: .semibold, design: .default)
+    /// HUD loader label, 14pt bold.
+    static let psHUDLabel = Font.system(size: 14, weight: .bold, design: .default)
+    /// Platform monogram, proportional to its tile so the initials
+    /// always fit. The one proportional size in the app; every other
+    /// size is a fixed named style above.
+    static func psMonogram(for tileSize: CGFloat) -> Font {
+        Font.system(size: tileSize * 0.34, weight: .bold, design: .default)
+    }
+}
+
+/// Canonical text styles, v5. Every screen uses these and nothing
+/// else for type: one size per role, app-wide. The Font statics
+/// above are the single source of truth; PSTextStyle is the named
+/// set to use via .psTextStyle(_:). Body text is one size (15pt)
+/// everywhere. Other agents: use PSTextStyle in your files too, and
+/// do not add ad-hoc system-size font calls.
+enum PSTextStyle {
+    case largeTitle
+    case title
+    case headline
+    case body
+    case subheadline
+    case caption
+    case mono
+
+    var font: Font {
+        switch self {
+        case .largeTitle: return .psLargeTitle
+        case .title: return .psTitle
+        case .headline: return .psHeadline
+        case .body: return .psBody
+        case .subheadline: return .psSubheadline
+        case .caption: return .psCaption
+        case .mono: return .psMono
+        }
+    }
+}
+
+extension View {
+    /// Apply a canonical PSTextStyle.
+    func psTextStyle(_ style: PSTextStyle) -> some View {
+        font(style.font)
+    }
 }
 
 struct PSPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.white)
+            .font(.psButton)
+            .foregroundStyle(.psPaper)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 13)
             .background(

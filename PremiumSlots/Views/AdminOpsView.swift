@@ -100,6 +100,7 @@ struct AdminTicketsRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func ticketRow(_ ticket: AdminGenericRow) -> some View {
@@ -237,6 +238,7 @@ struct AdminWaitlistView: View {
                     .psScreenPadding()
                 }
             }
+            .scrollIndicators(.hidden)
         }
         .background(Color.psBackground)
         .navigationTitle("Waitlist")
@@ -358,6 +360,7 @@ struct AdminSuggestionsRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func load() async {
@@ -482,6 +485,7 @@ struct AdminCommsView: View {
                     .psScreenPadding()
                 }
             }
+            .scrollIndicators(.hidden)
         }
         .background(Color.psBackground)
         .navigationTitle("Comms")
@@ -667,6 +671,7 @@ struct AdminSecurityLogsView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func load() async {
@@ -817,6 +822,7 @@ struct AdminRecycleBinView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func archivedRow(_ row: AdminGenericRow, kind: String) -> some View {
@@ -961,6 +967,7 @@ struct AdminBackupStatusView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func load() async {

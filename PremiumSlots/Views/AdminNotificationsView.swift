@@ -145,7 +145,7 @@ struct AdminNotificationsRootView: View {
                     ForEach(notifications) { item in
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: item.systemImage)
-                                .font(.system(size: 20))
+                                .font(.psIcon)
                                 .foregroundStyle(item.tint)
                                 .frame(width: 22)
                                 .accessibilityHidden(true)

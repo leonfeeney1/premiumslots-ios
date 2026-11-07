@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Account, Fix #4
+// MARK: - Account, Fix #4, v5
 // Checklist 1.10: profile update (PUT /api/v1/me/profile, name +
 // WhatsApp, both required), change password (POST /api/v1/me/password,
 // strong-password rule 8+ chars with upper + lower + digit), privacy
@@ -8,11 +8,11 @@ import SwiftUI
 // revoke (existing APISession type and APIClient.mySessions /
 // revokeSession), security screen, delete account (DELETE /api/v1/me
 // with {"confirm": true}, signs out after), GDPR consent
-// (GET/POST /api/v1/me/gdpr-consent) and export request
-// (POST /api/v1/me/export-request).
-// Passkeys: the WebAuthn JSON endpoints were not built, so passkeys
-// are not available in this build. The security screen says so
-// plainly and does not fake a passkey flow.
+// (GET/POST /api/v1/me/gdpr-consent, four types data_processing,
+// marketing, analytics, communications, each defaulting to granted)
+// and data export (GET /api/v1/me/export when the server offers it,
+// else POST /api/v1/me/export-request).
+// Passkeys (v5): native sign-in and management in PasskeyAuth.swift.
 // No NavigationStack here: this view is pushed from Settings, so it
 // uses the parent stack. No emojis, SF Symbols only.
 
@@ -77,13 +77,13 @@ struct AccountRootView: View {
                         .font(.psBody)
                 }
                 NavigationLink {
-                    PrivacyView()
+                    FullPrivacyPolicyView()
                 } label: {
                     Label("Privacy policy", systemImage: "hand.raised.fill")
                         .font(.psBody)
                 }
                 NavigationLink {
-                    TermsView()
+                    FullTermsView()
                 } label: {
                     Label("Terms of service", systemImage: "doc.plaintext.fill")
                         .font(.psBody)
@@ -100,11 +100,12 @@ struct AccountRootView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
         .safeAreaPadding(.bottom, 8)
     }
 }
@@ -154,6 +155,9 @@ struct AccProfileView: View {
         .background(Color.psBackground)
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
+        .hideKeyboardOnTap()
         .task {
             name = appState.user?.name ?? ""
             whatsapp = appState.user?.whatsapp_number ?? ""
@@ -243,6 +247,9 @@ struct AccPasswordView: View {
         .background(Color.psBackground)
         .navigationTitle("Password")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
+        .hideKeyboardOnTap()
     }
 
     private func save() async {
@@ -304,13 +311,15 @@ struct AccPrivacyView: View {
             } header: {
                 Text("Privacy and notifications")
             } footer: {
-                Text("These are the same notification settings as on premiumslots.tech. Turning them off stops order and renewal messages on that channel.")
+                Text("These are the same notification settings as on the PremiumSlots website. Turning them off stops order and renewal messages on that channel.")
             }
         }
         .scrollContentBackground(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
     }
 
     private func save() async {
@@ -416,6 +425,7 @@ struct AccSessionsView: View {
         .background(Color.psBackground)
         .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollIndicators(.hidden)
         .refreshable { await load() }
         .task { await load() }
         .safeAreaPadding(.bottom, 8)
@@ -443,17 +453,27 @@ struct AccSessionsView: View {
     }
 }
 
-// MARK: - Security (passkeys honestly unavailable)
+// MARK: - Security (passkeys, v5)
 
 struct AccSecurityView: View {
     var body: some View {
         List {
             Section("Passkeys") {
-                Text("Passkeys are not available in this build.")
-                    .font(.psHeadline)
-                Text("The WebAuthn JSON endpoints were not built on the server, so there is no passkey sign-in to set up here. Sign in stays with your password and your Clerk session.")
-                    .font(.psBody)
-                    .foregroundStyle(.psMuted)
+                NavigationLink {
+                    PasskeyManagementView()
+                } label: {
+                    Label("Passkeys", systemImage: "key.fill")
+                        .font(.psBody)
+                }
+                if let storedID = PasskeyAuthManager.storedCredentialID {
+                    Text("This device has a passkey (credential \(storedID.prefix(12))...).")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                } else {
+                    Text("No passkey on this device yet. Add one to sign in without your password.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                }
             }
             Section("Password and sessions") {
                 NavigationLink {
@@ -477,6 +497,7 @@ struct AccSecurityView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Security")
         .navigationBarTitleDisplayMode(.inline)
@@ -524,6 +545,9 @@ struct AccDeleteView: View {
         .background(Color.psBackground)
         .navigationTitle("Delete account")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
+        .hideKeyboardOnTap()
         .alert("Delete your account?", isPresented: $showConfirm) {
             Button("Delete", role: .destructive) {
                 Task { await deleteAccount() }
@@ -547,16 +571,45 @@ struct AccDeleteView: View {
     }
 }
 
-// MARK: - GDPR consent and data export
+// MARK: - GDPR consent and data export, v5
+// Four consent types from GET /api/v1/me/gdpr-consent, each a
+// {granted, granted_at, revoked_at} entry defaulting to granted.
+// data_processing is REQUIRED: the privacy policy says data is used
+// strictly for operational purposes (verifying payments, fulfilling
+// subscription slots, sending account notifications, verification
+// codes, password resets and renewal reminders), so turning it off
+// means the account cannot run. Turning it off shows a clear
+// message first, and a saved off state shows a banner with a
+// one-tap way back on. There is no silent lockout and no dead end:
+// the same screen always lets the user re-enable it.
+// marketing, analytics and communications are optional and can be
+// turned off freely.
+// Export: GET /api/v1/me/export when the server offers it (the
+// backend agent is adding it); the real file is then shared with
+// the iOS share sheet (AdminShareSheet wraps
+// UIActivityViewController) and an empty file is never presented.
+// NOTE: the web has no download endpoint and no file format at all
+// (SOURCES.md section 11): the web export is a request workflow
+// only (DataExportRequests, pending to processing, nothing ever
+// generates a file). So GET /api/v1/me/export must generate the
+// file itself from the real tables; there is no web file to mirror.
+// Until that endpoint exists, POST /api/v1/me/export-request
+// records the request and the app says so, with the request id.
 
 struct AccGDPRView: View {
-    @State private var consented = false
-    @State private var marketing = false
-    @State private var analytics = false
+    @State private var dataProcessing = true
+    @State private var marketing = true
+    @State private var analytics = true
+    @State private var communications = true
     @State private var isLoading = false
     @State private var resultMessage: String?
     @State private var isSaving = false
-    @State private var isRequestingExport = false
+    @State private var showRequiredAlert = false
+    @State private var savedDataProcessingOff = false
+    @State private var isExporting = false
+    @State private var exportFileURL: URL?
+    @State private var exportMessage: String?
+    @State private var showExportShare = false
 
     var body: some View {
         Form {
@@ -568,15 +621,41 @@ struct AccGDPRView: View {
                         Spacer()
                     }
                 } else {
-                    Toggle("I consent to my data being used to run my account", isOn: $consented)
-                        .tint(.psCyan)
-                        .accessibilityLabel("Consent to data use for my account")
-                    Toggle("Marketing messages", isOn: $marketing)
-                        .tint(.psCyan)
-                        .accessibilityLabel("Marketing messages consent")
-                    Toggle("Analytics", isOn: $analytics)
-                        .tint(.psCyan)
-                        .accessibilityLabel("Analytics consent")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Data processing", isOn: $dataProcessing)
+                            .tint(.psCyan)
+                            .accessibilityLabel("Data processing consent, required")
+                            .onChange(of: dataProcessing) { _, newValue in
+                                if !newValue { showRequiredAlert = true }
+                            }
+                        Text("Required to run your account: verifying payments, fulfilling subscription slots, and sending account notifications, verification codes, password resets and renewal reminders.")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Marketing messages", isOn: $marketing)
+                            .tint(.psCyan)
+                            .accessibilityLabel("Marketing messages consent")
+                        Text("Offers and news about PremiumSlots. Optional.")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Analytics", isOn: $analytics)
+                            .tint(.psCyan)
+                            .accessibilityLabel("Analytics consent")
+                        Text("Usage data used to improve PremiumSlots. Optional.")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Account communications", isOn: $communications)
+                            .tint(.psCyan)
+                            .accessibilityLabel("Account communications consent")
+                        Text("Account messages by email and WhatsApp. Optional.")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
                     Button {
                         Task { await saveConsent() }
                     } label: {
@@ -588,19 +667,42 @@ struct AccGDPRView: View {
                 }
             } header: {
                 Text("GDPR consent")
+            } footer: {
+                Text("All four start on. Only data processing is required; the other three can be turned off at any time.")
+            }
+            if savedDataProcessingOff {
+                Section {
+                    Label("Data processing is off", systemImage: "exclamationmark.triangle.fill")
+                        .font(.psHeadline)
+                        .foregroundStyle(.psWarning)
+                    Text("PremiumSlots cannot run your account without it: payments cannot be verified and slots cannot be delivered. Turn it back on to use your account again.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                    Button("Turn data processing back on") {
+                        dataProcessing = true
+                        Task { await saveConsent() }
+                    }
+                    .psPrimary()
+                    .disabled(isSaving)
+                }
             }
             Section {
-                Text("Ask for a copy of the data PremiumSlots holds about you. The request is recorded and handled by the team.")
+                Text("Download a copy of the data PremiumSlots holds about you. The file opens in the share sheet so you can save it or send it where you like.")
                     .font(.psBody)
                     .foregroundStyle(.psMuted)
                 Button {
-                    Task { await requestExport() }
+                    Task { await fetchExport() }
                 } label: {
-                    if isRequestingExport { PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7) }
-                    else { Label("Request my data export", systemImage: "square.and.arrow.down.fill") }
+                    if isExporting { PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7) }
+                    else { Label("Download my data export", systemImage: "square.and.arrow.down.fill") }
                 }
                 .psPrimary()
-                .disabled(isRequestingExport)
+                .disabled(isExporting)
+                if let exportMessage {
+                    Text(exportMessage)
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                }
             } header: {
                 Text("Data export")
             }
@@ -616,18 +718,37 @@ struct AccGDPRView: View {
         .background(Color.psBackground)
         .navigationTitle("Data and privacy")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
         .task { await load() }
+        .alert("Data processing is required", isPresented: $showRequiredAlert) {
+            Button("Keep it on") {
+                dataProcessing = true
+            }
+            Button("Turn it off", role: .destructive) {
+                dataProcessing = false
+            }
+        } message: {
+            Text("PremiumSlots uses your data strictly to run your account: verifying payments, fulfilling subscription slots, and sending account notifications, verification codes, password resets and renewal reminders. Without it your account cannot be used. You can turn it back on here at any time.")
+        }
+        .sheet(isPresented: $showExportShare) {
+            if let exportFileURL {
+                AdminShareSheet(urls: [exportFileURL])
+            }
+        }
     }
 
     private func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: AccGDPRResponse = try await APIClient.shared.fetchJSON("api/v1/me/gdpr-consent")
+            let response: AccGDPRMapResponse = try await APIClient.shared.fetchJSON("api/v1/me/gdpr-consent")
             if let consent = response.consent {
-                consented = consent.consented ?? false
-                marketing = consent.marketing ?? false
-                analytics = consent.analytics ?? false
+                dataProcessing = consent["data_processing"]?.granted ?? true
+                marketing = consent["marketing"]?.granted ?? true
+                analytics = consent["analytics"]?.granted ?? true
+                communications = consent["communications"]?.granted ?? true
+                savedDataProcessingOff = !dataProcessing
             }
         } catch {
             resultMessage = error.localizedDescription
@@ -640,38 +761,86 @@ struct AccGDPRView: View {
         do {
             let _: APIResponse = try await APIClient.shared.fetchJSON(
                 "api/v1/me/gdpr-consent", method: "POST",
-                body: ["consented": consented, "marketing": marketing, "analytics": analytics])
-            resultMessage = "Consent saved."
+                body: ["consent": [
+                    "data_processing": dataProcessing,
+                    "marketing": marketing,
+                    "analytics": analytics,
+                    "communications": communications,
+                ]])
+            savedDataProcessingOff = !dataProcessing
+            resultMessage = dataProcessing
+                ? "Consent saved."
+                : "Consent saved. Data processing is off, so your account cannot be used until you turn it back on above."
         } catch {
             resultMessage = error.localizedDescription
         }
     }
 
-    private func requestExport() async {
-        isRequestingExport = true
-        defer { isRequestingExport = false }
+    private func fetchExport() async {
+        isExporting = true
+        exportMessage = nil
+        exportFileURL = nil
+        defer { isExporting = false }
         do {
-            let _: APIResponse = try await APIClient.shared.fetchJSON(
-                "api/v1/me/export-request", method: "POST", body: [:])
-            resultMessage = "Your data export request was recorded."
+            let data = try await APIClient.shared.fetchData("api/v1/me/export")
+            guard !data.isEmpty else {
+                exportMessage = "The export came back empty. Please try again."
+                return
+            }
+            // There is no export file on the web at all (the web
+            // export is a request workflow only), so the format is
+            // whatever GET /api/v1/me/export generates from the
+            // real tables. The name below is the file the share
+            // sheet offers.
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("premiumslots-data-export.json")
+            try data.write(to: url, options: .atomic)
+            exportFileURL = url
+            exportMessage = "Your data export is ready to share."
+            showExportShare = true
         } catch {
-            resultMessage = error.localizedDescription
+            if case APIError.http(let code, _) = error, code == 404 {
+                await requestExport()
+            } else {
+                exportMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func requestExport() async {
+        do {
+            let response: AccExportRequestResponse = try await APIClient.shared.fetchJSON(
+                "api/v1/me/export-request", method: "POST", body: ["request_type": "export_all"])
+            if let requestID = response.request_id {
+                exportMessage = "Your data export was requested (request #\(requestID)). You will be notified when it is ready."
+            } else {
+                exportMessage = response.message ?? "Your data export request was recorded."
+            }
+        } catch {
+            exportMessage = error.localizedDescription
         }
     }
 }
 
 // MARK: - GDPR response types (keys from backend/api_v1.py)
 
-struct AccGDPRConsent: Decodable {
-    let consented: Bool?
-    let marketing: Bool?
-    let analytics: Bool?
-    let created_at: String?
+struct AccGDPRConsentEntry: Decodable {
+    let granted: Bool?
+    let granted_at: String?
+    let revoked_at: String?
 }
 
-struct AccGDPRResponse: Decodable {
+struct AccGDPRMapResponse: Decodable {
     let ok: Bool
-    let consent: AccGDPRConsent?
+    let consent: [String: AccGDPRConsentEntry]?
+}
+
+struct AccExportRequestResponse: Decodable {
+    let ok: Bool
+    let request_id: Int?
+    let status: String?
+    let message: String?
+    let error: String?
 }
 
 #Preview {

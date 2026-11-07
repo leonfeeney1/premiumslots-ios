@@ -403,7 +403,7 @@ struct CheckoutView: View {
                     UIPasteboard.general.string = value
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.system(size: 20))
+                        .font(.psIcon)
                 }
             }
         }

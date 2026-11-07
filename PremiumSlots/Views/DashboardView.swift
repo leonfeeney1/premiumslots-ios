@@ -280,9 +280,15 @@ struct DashboardRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                CustomerNotificationBell()
+            }
+        }
         .refreshable { await load() }
         .task { await load() }
         .sheet(isPresented: $showAuth) {
@@ -314,7 +320,7 @@ struct DashboardRootView: View {
     private func dashStep(number: String, title: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text(number)
-                .font(.system(size: 17, weight: .semibold))
+                .font(.psHeadline)
                 .foregroundStyle(.psCyan)
                 .frame(width: 32, height: 32)
                 .background(Color.psPrimarySoft)

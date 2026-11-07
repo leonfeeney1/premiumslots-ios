@@ -105,7 +105,11 @@ struct PSLoyaltyData: Decodable {
 
 // MARK: - Achievements response models
 // Keys verified against backend/api_v1.py my_achievements().
-// Each badge definition carries an "earned" flag added by the server.
+// Each badge definition carries an "earned" flag added by the
+// server. BadgeDefinitions has no id column (its key is code), so
+// rows are identified by code. Earned dates come from the separate
+// "earned" array (UserBadges rows, badge_code plus the row date),
+// which the app previously ignored entirely.
 
 struct PSBadgeDefinition: Decodable {
     let id: Int?
@@ -116,6 +120,19 @@ struct PSBadgeDefinition: Decodable {
     let category: String?
     let tier: String?
     let earned: Bool?
+
+    // The server returns no id for definitions, so every badge
+    // decoded with id nil. ForEach over id collapsed the grid to a
+    // subset of the badges. Code is the real key.
+    var rowID: String { code ?? name ?? "badge" }
+}
+
+struct PSEarnedBadge: Decodable {
+    let badge_code: String?
+    let created_at: String?
+    let earned_at: String?
+
+    var earnedDate: String? { earned_at ?? created_at }
 }
 
 struct PSAchievementStats: Decodable {
@@ -127,6 +144,7 @@ struct PSAchievementStats: Decodable {
 struct PSAchievementsData: Decodable {
     let ok: Bool
     let badges: [PSBadgeDefinition]?
+    let earned: [PSEarnedBadge]?
     let stats: PSAchievementStats?
 }
 
@@ -255,7 +273,7 @@ struct StoreRootView: View {
                                     UIPasteboard.general.string = coupon
                                 } label: {
                                     Image(systemName: "doc.on.doc")
-                                        .font(.system(size: 20))
+                                        .imageScale(.large)
                                 }
                                 .accessibilityLabel("Copy reward code \(coupon)")
                             }
@@ -304,6 +322,7 @@ struct StoreRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .refreshable { await load() }
     }
@@ -429,7 +448,7 @@ struct PSStoreRedemptionRow: View {
                         UIPasteboard.general.string = coupon
                     } label: {
                         Image(systemName: "doc.on.doc")
-                            .font(.system(size: 20))
+                            .imageScale(.large)
                     }
                     .accessibilityLabel("Copy reward code \(coupon)")
                 }
@@ -573,6 +592,7 @@ struct LoyaltyRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .refreshable { await load() }
     }
@@ -607,7 +627,7 @@ struct PSLoyaltyLedgerRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "star.fill")
-                .font(.system(size: 20))
+                .imageScale(.large)
                 .foregroundStyle(.psAmber)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
@@ -634,6 +654,7 @@ struct AchievementsRootView: View {
     @State private var data: PSAchievementsData?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var filter = "all"
 
     private var badges: [PSBadgeDefinition] {
         data?.badges ?? []
@@ -641,6 +662,31 @@ struct AchievementsRootView: View {
 
     private var earnedCount: Int {
         badges.filter { $0.earned == true }.count
+    }
+
+    private var earnedDates: [String: String] {
+        var map: [String: String] = [:]
+        for row in data?.earned ?? [] {
+            if let code = row.badge_code, let date = row.earnedDate {
+                map[code] = date
+            }
+        }
+        return map
+    }
+
+    // The filter only narrows what is shown on request. The default
+    // is All, so every badge from the server is always listed.
+    private var visibleBadges: [PSBadgeDefinition] {
+        switch filter {
+        case "earned": return badges.filter { $0.earned == true }
+        case "locked": return badges.filter { $0.earned != true }
+        default: return badges
+        }
+    }
+
+    private var progress: Double {
+        guard !badges.isEmpty else { return 0 }
+        return Double(earnedCount) / Double(badges.count)
     }
 
     var body: some View {
@@ -676,6 +722,17 @@ struct AchievementsRootView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(earnedCount) of \(badges.count) badges earned")
                             .font(.psHeadline)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.psBorder)
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.psCyan)
+                                    .frame(width: geo.size.width * progress)
+                            }
+                        }
+                        .frame(height: 8)
+                        .accessibilityLabel("\(earnedCount) of \(badges.count) badges earned")
                         HStack(spacing: 16) {
                             Text("\(data?.stats?.points ?? 0) points")
                                 .font(.psCaption)
@@ -691,22 +748,42 @@ struct AchievementsRootView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                Picker("Show", selection: $filter) {
+                    Text("All (\(badges.count))").tag("all")
+                    Text("Earned (\(earnedCount))").tag("earned")
+                    Text("Locked (\(badges.count - earnedCount))").tag("locked")
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Filter achievements")
+
                 if badges.isEmpty {
                     PSEmptyState(
                         systemImage: "rosette",
                         title: "No badges yet",
                         body: "Badges are earned for first and milestone subscriptions, streaks, referrals, coupons and birthday bonuses."
                     )
+                } else if visibleBadges.isEmpty {
+                    PSEmptyState(
+                        systemImage: "rosette",
+                        title: filter == "earned" ? "No badges earned yet" : "No locked badges",
+                        body: filter == "earned"
+                            ? "Badges you earn will show here with the date you earned them."
+                            : "Every badge is earned. Well done."
+                    )
                 } else {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(badges, id: \.id) { badge in
-                            PSAchievementCell(badge: badge)
+                        ForEach(visibleBadges, id: \.rowID) { badge in
+                            PSAchievementCell(
+                                badge: badge,
+                                earnedDate: badge.code.flatMap { earnedDates[$0] }
+                            )
                         }
                     }
                 }
             }
             .psScreenPadding()
         }
+        .scrollIndicators(.hidden)
         .refreshable { await load() }
     }
 
@@ -725,6 +802,7 @@ struct AchievementsRootView: View {
 
 struct PSAchievementCell: View {
     let badge: PSBadgeDefinition
+    var earnedDate: String?
 
     private var earned: Bool { badge.earned == true }
 
@@ -732,7 +810,7 @@ struct PSAchievementCell: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: earned ? "checkmark.seal.fill" : "lock.fill")
-                    .font(.system(size: 20))
+                    .imageScale(.large)
                     .foregroundStyle(earned ? .psSuccess : .psMuted)
                     .accessibilityHidden(true)
                 Spacer()
@@ -754,9 +832,15 @@ struct PSAchievementCell: View {
                     .font(.psCaption)
                     .foregroundStyle(.psMuted)
             }
-            Text(earned ? "Earned" : "Locked")
-                .font(.psCaption)
-                .foregroundStyle(earned ? .psSuccess : .psMuted)
+            if earned, let earnedDate {
+                Text("Earned \(psShortDate(earnedDate))")
+                    .font(.psCaption)
+                    .foregroundStyle(.psSuccess)
+            } else {
+                Text(earned ? "Earned" : "Locked")
+                    .font(.psCaption)
+                    .foregroundStyle(earned ? .psSuccess : .psMuted)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -837,6 +921,7 @@ struct LeaderboardRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .refreshable { await load() }
     }
@@ -866,7 +951,7 @@ struct PSLeaderboardRow: View {
                 .frame(width: 28, alignment: .leading)
                 .accessibilityHidden(true)
             Image(systemName: rank == 1 ? "trophy.fill" : "person.fill")
-                .font(.system(size: 20))
+                .imageScale(.large)
                 .foregroundStyle(rank == 1 ? .psAmber : .psMuted)
                 .accessibilityHidden(true)
             Text(entry.name ?? "Member")
@@ -984,6 +1069,7 @@ struct BirthdaySaveView: View {
             }
             .psScreenPadding()
         }
+        .scrollIndicators(.hidden)
     }
 
     private func load() async {

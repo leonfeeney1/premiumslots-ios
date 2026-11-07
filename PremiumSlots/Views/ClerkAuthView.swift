@@ -119,7 +119,7 @@ struct ClerkAuthView: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.psHeadline)
                     .foregroundStyle(.psMuted)
                     .frame(width: 44, height: 44)
                     .background(Color.psSurface)

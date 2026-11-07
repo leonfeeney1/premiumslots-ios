@@ -80,9 +80,8 @@ struct TicketsRootView: View {
                                 Text(ticket.message ?? "")
                                     .font(.psBody)
                                     .foregroundStyle(.psMuted)
-                                    .lineLimit(3)
                                 if let date = ticket.created_at {
-                                    Text(date)
+                                    Text(psShortDate(date))
                                         .font(.psCaption)
                                         .foregroundStyle(.psMuted)
                                 }
@@ -158,6 +157,7 @@ struct TicketsRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.psBackground)
         .navigationTitle("Support tickets")
         .navigationBarTitleDisplayMode(.inline)

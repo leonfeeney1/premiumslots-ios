@@ -36,13 +36,19 @@ struct AdminCustomerRow: Decodable, Identifiable, Equatable {
     let has_wallet: Bool?
     let ltv: Int?
     let total_spent: Int?
+    let ltv_amount: Double?
+    let loyalty_tier: String?
+    let active_subs_count: Int?
+    let total_orders_count: Int?
     let receive_email_notifications: Bool?
 
     var isBanned: Bool { is_banned == true }
     var isActive: Bool { is_active ?? !isBanned }
     var isVIP: Bool { is_vip ?? ((loyalty_points ?? 0) >= 750) }
     var hasWallet: Bool { has_wallet ?? ((wallet_balance ?? 0) > 0) }
-    var lifetimeValue: Int { ltv ?? total_spent ?? 0 }
+    /// The list endpoint sends ltv_amount as a number (a SQL SUM),
+    /// not ltv or total_spent, so those two stay as fallbacks only.
+    var lifetimeValue: Int { ltv ?? total_spent ?? Int(ltv_amount ?? 0) }
 }
 
 struct AdminCustomersListResponse: Decodable {
@@ -280,6 +286,7 @@ struct AdminCustomersRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func customerRow(_ customer: AdminCustomerRow) -> some View {
@@ -287,7 +294,7 @@ struct AdminCustomersRootView: View {
             if isSelecting {
                 Image(systemName: selectedIds.contains(customer.id) ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(selectedIds.contains(customer.id) ? .psPrimary : .psMuted)
-                    .font(.system(size: 20))
+                    .font(.psHeadline)
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -433,6 +440,7 @@ struct AdminCustomerDetailSheet: View {
                 }
                 .psScreenPadding()
             }
+            .scrollIndicators(.hidden)
             .background(Color.psBackground)
             .navigationTitle(customer.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -517,37 +525,27 @@ struct AdminCustomerDetailSheet: View {
             PSCard {
                 VStack(alignment: .leading, spacing: 10) {
                     PSSectionHeader(title: "Actions")
-                    HStack(spacing: 10) {
-                        Button("Toggle emails") { Task { await toggleEmails() } }
-                            .buttonStyle(.bordered)
-                            .tint(.psCyan)
-                            .disabled(isWorking)
-                        Button("Adjust wallet") { showWalletForm = true }
-                            .buttonStyle(.bordered)
-                            .tint(.psCyan)
-                            .disabled(isWorking)
-                        Button("Adjust points") { showPointsForm = true }
-                            .buttonStyle(.bordered)
-                            .tint(.psCyan)
-                            .disabled(isWorking)
+                    AdminActionButton(label: "Adjust wallet", systemImage: "wallet.bifold.fill", tint: .psPrimary, disabled: isWorking) {
+                        showWalletForm = true
                     }
-                    HStack(spacing: 10) {
-                        Button("Reset password") { Task { await resetPassword() } }
-                            .buttonStyle(.bordered)
-                            .tint(.psCyan)
-                            .disabled(isWorking)
-                        Button("Send email") { showEmailForm = true }
-                            .buttonStyle(.bordered)
-                            .tint(.psCyan)
-                            .disabled(isWorking)
-                        Button(customer.isBanned ? "Unban" : "Ban") { Task { await toggleBan() } }
-                            .buttonStyle(.bordered)
-                            .tint(customer.isBanned ? .psSuccess : .psDanger)
-                            .disabled(isWorking)
+                    AdminActionButton(label: "Send email", systemImage: "envelope.fill", tint: .psPrimary, disabled: isWorking) {
+                        showEmailForm = true
                     }
-                    Button("Delete customer", role: .destructive) { showDeleteConfirm = true }
-                        .buttonStyle(.bordered)
-                        .disabled(isWorking)
+                    AdminActionButton(label: "Toggle emails", systemImage: "bell.fill", tint: .psDim, disabled: isWorking) {
+                        Task { await toggleEmails() }
+                    }
+                    AdminActionButton(label: "Adjust points", systemImage: "star.fill", tint: .psDim, disabled: isWorking) {
+                        showPointsForm = true
+                    }
+                    AdminActionButton(label: "Reset password", systemImage: "key.fill", tint: .psDim, disabled: isWorking) {
+                        Task { await resetPassword() }
+                    }
+                    AdminActionButton(label: customer.isBanned ? "Unban customer" : "Ban customer", systemImage: customer.isBanned ? "checkmark.circle.fill" : "nosign", tint: customer.isBanned ? .psSuccess : .psDanger, isDestructive: !customer.isBanned, disabled: isWorking) {
+                        Task { await toggleBan() }
+                    }
+                    AdminActionButton(label: "Delete customer", systemImage: "trash.fill", tint: .psDanger, isDestructive: true, disabled: isWorking) {
+                        showDeleteConfirm = true
+                    }
                     if isWorking {
                         PSRingSpinner(diameter: 20, lineWidth: 2)
                     }
@@ -570,9 +568,9 @@ struct AdminCustomerDetailSheet: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(sub.service_requested)
                                 .font(.psHeadline)
-                            Text("Order #\(sub.id) · KES \(sub.amount_due) · \(sub.status) · expires \(adminShortDate(sub.expiry_date))")
+                            Text("Order #\(sub.id) · KES \(sub.amount_due) · \(sub.status) · \(sub.daysLeftText)")
                                 .font(.psCaption)
-                                .foregroundStyle(.psMuted)
+                                .foregroundStyle(adminDaysLeftTint(expiryDate: sub.expiry_date, apiDays: sub.days_remaining))
                         }
                         .padding(.vertical, 4)
                     }
@@ -797,6 +795,7 @@ struct AdminCreateCustomerSheet: View {
                 }
                 .psScreenPadding()
             }
+            .scrollIndicators(.hidden)
             .background(Color.psBackground)
             .navigationTitle("Create customer")
             .navigationBarTitleDisplayMode(.inline)

@@ -25,6 +25,7 @@ struct AdminSubscriptionRow: Decodable, Identifiable, Equatable {
     let delivery_type: String?
     let status: String
     let expiry_date: String?
+    let days_remaining: Int?
     let viewed: Bool?
     let issue_reported: Bool?
     let account_group: String?
@@ -36,10 +37,23 @@ struct AdminSubscriptionRow: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, service_requested, amount_due, mpesa_code, delivery_type
-        case status, expiry_date, viewed, issue_reported, account_group
+        case status, expiry_date, days_remaining, viewed, issue_reported, account_group
         case created_at, locked_price, customer_name
         case customer_whatsapp = "whatsapp_number"
         case customer_email = "email"
+    }
+
+    /// Days left, preferring the server value and otherwise computed
+    /// locally from expiry_date. The server row builder does not
+    /// send days_remaining yet, so the local fallback is what
+    /// actually fills this today.
+    var daysRemaining: Int? {
+        adminDaysRemaining(expiryDate: expiry_date, apiDays: days_remaining)
+    }
+
+    /// Plain-language label: "Xd left", "Expires today" or "Expired".
+    var daysLeftText: String {
+        adminDaysLeftText(expiryDate: expiry_date, apiDays: days_remaining)
     }
 
     /// Display name for admin rows. Never a made-up name: the real
@@ -206,6 +220,7 @@ struct AdminSubscriptionsRootView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
     }
 
     private func subscriptionRow(_ sub: AdminSubscriptionRow) -> some View {
@@ -213,7 +228,7 @@ struct AdminSubscriptionsRootView: View {
             if isSelecting {
                 Image(systemName: selectedIds.contains(sub.id) ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(selectedIds.contains(sub.id) ? .psPrimary : .psMuted)
-                    .font(.system(size: 20))
+                    .font(.psHeadline)
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -224,9 +239,14 @@ struct AdminSubscriptionsRootView: View {
                 Text("Order #\(sub.id) · KES \(sub.amount_due) · code \(sub.mpesa_code ?? "-")")
                     .font(.psCaption)
                     .foregroundStyle(.psMuted)
-                Text("Expires \(adminShortDate(sub.expiry_date))")
-                    .font(.psCaption)
-                    .foregroundStyle(.psMuted)
+                HStack(spacing: 6) {
+                    Text(sub.daysLeftText)
+                        .font(.psCaption)
+                        .foregroundStyle(adminDaysLeftTint(expiryDate: sub.expiry_date, apiDays: sub.days_remaining))
+                    Text("· expires \(adminShortDate(sub.expiry_date))")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                }
             }
             Spacer()
             PSStatusPill(
@@ -358,6 +378,16 @@ struct AdminSubscriptionDetailSheet: View {
                     }
                     PSCard {
                         VStack(alignment: .leading, spacing: 8) {
+                            PSSectionHeader(title: "Expiry")
+                            Text(subscription.daysLeftText)
+                                .font(.psTitle)
+                                .foregroundStyle(adminDaysLeftTint(expiryDate: subscription.expiry_date, apiDays: subscription.days_remaining))
+                            AdminKVRow(label: "Expiry date", value: adminShortDate(subscription.expiry_date))
+                            AdminKVRow(label: "Status", value: status)
+                        }
+                    }
+                    PSCard {
+                        VStack(alignment: .leading, spacing: 8) {
                             PSSectionHeader(title: "Customer")
                             AdminKVRow(label: "Name", value: subscription.customerDisplayName)
                             AdminKVRow(label: "WhatsApp", value: subscription.customer_whatsapp ?? "-")
@@ -401,7 +431,9 @@ struct AdminSubscriptionDetailSheet: View {
                             SecureField("Vault password", text: $vaultPassword)
                                 .psTextField()
                             Button("Save changes") { Task { await saveEdits() } }
-                                .psPrimary()
+                                .buttonStyle(.bordered)
+                                .tint(.psDim)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                                 .disabled(isWorking)
                                 .accessibilityLabel("Save subscription changes")
                         }
@@ -420,38 +452,26 @@ struct AdminSubscriptionDetailSheet: View {
                     PSCard {
                         VStack(alignment: .leading, spacing: 10) {
                             PSSectionHeader(title: "Actions")
-                            HStack(spacing: 10) {
-                                Button("Approve") { Task { await approve() } }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.psPrimary)
-                                    .disabled(isWorking)
-                                    .accessibilityLabel("Approve subscription")
-                                Button("Reject", role: .destructive) { Task { await reject() } }
-                                    .buttonStyle(.bordered)
-                                    .disabled(isWorking)
-                                    .accessibilityLabel("Reject subscription")
+                            AdminActionButton(label: "Approve", systemImage: "checkmark.circle.fill", tint: .psSuccess, disabled: isWorking) {
+                                Task { await approve() }
                             }
-                            HStack(spacing: 10) {
-                                Button("Renew") { Task { await renew() } }
-                                    .buttonStyle(.bordered)
-                                    .tint(.psCyan)
-                                    .disabled(isWorking)
-                                Button("Unhide credentials") { Task { await unhide() } }
-                                    .buttonStyle(.bordered)
-                                    .tint(.psCyan)
-                                    .disabled(isWorking)
-                                Button("Remind expiry") { Task { await remindExpiry() } }
-                                    .buttonStyle(.bordered)
-                                    .tint(.psCyan)
-                                    .disabled(isWorking)
+                            AdminActionButton(label: "Reject", systemImage: "xmark.circle.fill", tint: .psDanger, isDestructive: true, disabled: isWorking) {
+                                Task { await reject() }
                             }
-                            HStack(spacing: 10) {
-                                Button("Cancel", role: .destructive) { showCancelConfirm = true }
-                                    .buttonStyle(.bordered)
-                                    .disabled(isWorking)
-                                Button("Delete", role: .destructive) { showDeleteConfirm = true }
-                                    .buttonStyle(.bordered)
-                                    .disabled(isWorking)
+                            AdminActionButton(label: "Renew", systemImage: "arrow.clockwise.circle.fill", tint: .psPrimary, disabled: isWorking) {
+                                Task { await renew() }
+                            }
+                            AdminActionButton(label: "Unhide credentials", systemImage: "eye.fill", tint: .psDim, disabled: isWorking) {
+                                Task { await unhide() }
+                            }
+                            AdminActionButton(label: "Remind expiry", systemImage: "bell.fill", tint: .psDim, disabled: isWorking) {
+                                Task { await remindExpiry() }
+                            }
+                            AdminActionButton(label: "Cancel subscription", systemImage: "pause.circle.fill", tint: .psWarning, isDestructive: true, disabled: isWorking) {
+                                showCancelConfirm = true
+                            }
+                            AdminActionButton(label: "Delete subscription", systemImage: "trash.fill", tint: .psDanger, isDestructive: true, disabled: isWorking) {
+                                showDeleteConfirm = true
                             }
                             if isWorking {
                                 PSRingSpinner(diameter: 20, lineWidth: 2)
@@ -466,6 +486,7 @@ struct AdminSubscriptionDetailSheet: View {
                 }
                 .psScreenPadding()
             }
+            .scrollIndicators(.hidden)
             .background(Color.psBackground)
             .navigationTitle("Order #\(subscription.id)")
             .navigationBarTitleDisplayMode(.inline)

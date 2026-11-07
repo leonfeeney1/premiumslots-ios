@@ -45,6 +45,130 @@ func adminShortDate(_ value: String?) -> String {
     return String(value.prefix(10))
 }
 
+/// Parse an expiry value the API sends: a YYYY-MM-DD date or a
+/// full ISO timestamp. Returns nil when there is no usable date.
+func adminExpiryDate(_ value: String?) -> Date? {
+    guard let value, !value.isEmpty else { return nil }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = iso.date(from: value) { return date }
+    iso.formatOptions = [.withInternetDateTime]
+    if let date = iso.date(from: value) { return date }
+    let plain = DateFormatter()
+    plain.locale = Locale(identifier: "en_US_POSIX")
+    plain.dateFormat = "yyyy-MM-dd"
+    return plain.date(from: String(value.prefix(10)))
+}
+
+/// Days from today (start of day) to the expiry date. Prefers the
+/// server value when present, otherwise computes it locally from
+/// expiry_date. Negative means already expired.
+func adminDaysRemaining(expiryDate: String?, apiDays: Int?) -> Int? {
+    if let apiDays { return apiDays }
+    guard let expiry = adminExpiryDate(expiryDate) else { return nil }
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: Date())
+    let end = calendar.startOfDay(for: expiry)
+    return calendar.dateComponents([.day], from: today, to: end).day
+}
+
+/// Plain-language days-left label. Never shows a negative number:
+/// a past expiry reads as Expired.
+func adminDaysLeftText(expiryDate: String?, apiDays: Int?) -> String {
+    guard let days = adminDaysRemaining(expiryDate: expiryDate, apiDays: apiDays) else {
+        return "No expiry date"
+    }
+    if days < 0 { return "Expired" }
+    if days == 0 { return "Expires today" }
+    if days == 1 { return "1d left" }
+    return "\(days)d left"
+}
+
+/// Tint for a days-left label: red once expired, amber today,
+/// muted while time remains.
+func adminDaysLeftTint(expiryDate: String?, apiDays: Int?) -> Color {
+    guard let days = adminDaysRemaining(expiryDate: expiryDate, apiDays: apiDays) else {
+        return .psMuted
+    }
+    if days < 0 { return .psDanger }
+    if days == 0 { return .psAmber }
+    return .psMuted
+}
+
+/// One flexible number: the API sometimes sends an Int, sometimes
+/// a Double (a SQL SUM) or a numeric string. Decodes all three so
+/// one shape change does not blank a whole screen.
+struct AdminFlexInt: Decodable {
+    let value: Int?
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            value = nil
+        } else if let intValue = try? container.decode(Int.self) {
+            value = intValue
+        } else if let doubleValue = try? container.decode(Double.self) {
+            value = Int(doubleValue)
+        } else if let text = try? container.decode(String.self) {
+            value = Int(text)
+        } else {
+            value = nil
+        }
+    }
+}
+
+extension KeyedDecodingContainer {
+    /// Read an Int field that may arrive as Int, Double or String.
+    func adminInt(forKey key: Key) -> Int? {
+        (try? decodeIfPresent(AdminFlexInt.self, forKey: key))??.value
+    }
+    /// Read a Double field that may arrive as Double, Int or String.
+    func adminDouble(forKey key: Key) -> Double? {
+        if let intValue = adminInt(forKey: key) { return Double(intValue) }
+        return nil
+    }
+}
+
+/// One full-width admin action row: icon, label and a distinct
+/// tint, with a 44pt minimum touch target. Used by the subscription
+/// and customer detail sheets so actions are never a row of
+/// same-colour cramped buttons.
+struct AdminActionButton: View {
+    let label: String
+    let systemImage: String
+    let tint: Color
+    var isDestructive = false
+    var disabled = false
+    var action: () -> Void
+
+    var body: some View {
+        Button(role: isDestructive ? .destructive : nil) {
+            action()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.psBody)
+                    .frame(width: 22)
+                    .accessibilityHidden(true)
+                Text(label)
+                    .font(.psHeadline)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 12)
+            .background(tint.opacity(0.12))
+            .foregroundStyle(tint)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .accessibilityLabel(label)
+    }
+}
+
 func adminTempFileURL(data: Data, fileName: String) -> URL? {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent(fileName)
@@ -99,21 +223,148 @@ struct AdminNotSignedInView: View {
 }
 
 // MARK: - Analytics payloads
-// GET /api/v1/admin/analytics returns:
-// {"ok": true, "days": Int, "service": String, "status": String,
-//  "daily_revenue": [{"day": "YYYY-MM-DD", "revenue": Int, "orders": Int}],
-//  "totals": {"revenue": Int, "orders": Int},
-//  "churn_users": [...], "churn_count": Int, "churn_note": String?}
+// GET /api/v1/admin/analytics returns the new contract:
+// {"ok": true, "revenue_by_day": [{"day", "revenue", "orders"}],
+//  "by_service": [{"service", "revenue", "orders"}],
+//  "by_status": [{"status", "count"}],
+//  "churn": null | {"count": Int, "users": [...], "note": String},
+//  "totals": {"revenue": Int, "orders": Int}}
+// The live backend in the workspace still returns the older keys
+// (daily_revenue, churn_users, churn_count, churn_note, plus
+// top_services / status as labels-and-data objects and a totals
+// object that the extras overwrite), so every field below decodes
+// BOTH shapes and both number forms (Int, Double, String). A
+// missing or null metric stays nil and the screen says so honestly
+// instead of showing 0 or a blank screen.
 
 struct AdminDailyRevenue: Decodable {
     let day: String?
     let revenue: Int?
     let orders: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case day, date, revenue, orders, count
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decodeIfPresent(String.self, forKey: .day)
+            ?? container.decodeIfPresent(String.self, forKey: .date)
+        revenue = container.adminInt(forKey: .revenue)
+        orders = container.adminInt(forKey: .orders)
+            ?? container.adminInt(forKey: .count)
+    }
 }
 
 struct AdminAnalyticsTotals: Decodable {
     let revenue: Int?
     let orders: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case revenue, orders, users, active_subs, revenue_this_month
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        revenue = container.adminInt(forKey: .revenue)
+        orders = container.adminInt(forKey: .orders)
+    }
+}
+
+/// One row of a labels-and-data object, e.g. {"labels": [...],
+/// "data": [...]}, which the backend uses for top_services and
+/// ticket status. Converted to the same row shape as by_service.
+struct AdminLabelledSeries: Decodable {
+    let labels: [String]?
+    let data: [Double]?
+}
+
+struct AdminByStatusRow: Decodable, Identifiable {
+    let status: String
+    let count: Int
+    let revenue: Int?
+
+    var id: String { status }
+
+    init(status: String, count: Int, revenue: Int?) {
+        self.status = status
+        self.count = count
+        self.revenue = revenue
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case status, label, name, service_requested, count, orders, n, value, revenue
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+            ?? container.decodeIfPresent(String.self, forKey: .label)
+            ?? container.decodeIfPresent(String.self, forKey: .name)
+            ?? container.decodeIfPresent(String.self, forKey: .service_requested)
+            ?? "Unknown"
+        count = container.adminInt(forKey: .count)
+            ?? container.adminInt(forKey: .orders)
+            ?? container.adminInt(forKey: .n)
+            ?? container.adminInt(forKey: .value)
+            ?? 0
+        revenue = container.adminInt(forKey: .revenue)
+    }
+}
+
+/// Churn as the contract defines it: null means not available yet,
+/// an object carries a count, a user list and an optional note, an
+/// array is a plain user list. The older backend shape
+/// (churn_users / churn_count / churn_note) is read as a fallback.
+struct AdminChurn: Decodable {
+    let available: Bool
+    let count: Int?
+    let users: [AdminGenericRow]
+    let note: String?
+
+    static let unavailable = AdminChurn(available: false, count: nil, users: [], note: nil)
+
+    init(available: Bool, count: Int?, users: [AdminGenericRow], note: String?) {
+        self.available = available
+        self.count = count
+        self.users = users
+        self.note = note
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case count, total, at_risk, users, list, note
+    }
+
+    init(from decoder: Decoder) throws {
+        // Try the object shape first: a keyed container on a null
+        // or array value throws without consuming the decoder, so
+        // the single-value shapes below still decode afterwards.
+        if let keyed = try? decoder.container(keyedBy: CodingKeys.self) {
+            let count = keyed.adminInt(forKey: .count)
+                ?? keyed.adminInt(forKey: .total)
+                ?? keyed.adminInt(forKey: .at_risk)
+            let users = (try? keyed.decodeIfPresent([AdminGenericRow].self, forKey: .users))
+                ?? (try? keyed.decodeIfPresent([AdminGenericRow].self, forKey: .list))
+                ?? []
+            let note = try keyed.decodeIfPresent(String.self, forKey: .note)
+            self.init(available: true, count: count ?? users.count, users: users, note: note)
+            return
+        }
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .unavailable
+            return
+        }
+        if let users = try? container.decode([AdminGenericRow].self) {
+            self.init(available: true, count: users.count, users: users, note: nil)
+            return
+        }
+        if let count = try? container.decode(Int.self) {
+            self.init(available: true, count: count, users: [], note: nil)
+            return
+        }
+        self = .unavailable
+    }
 }
 
 struct AdminAnalyticsResponse: Decodable {
@@ -121,11 +372,78 @@ struct AdminAnalyticsResponse: Decodable {
     let days: Int?
     let service: String?
     let status: String?
-    let daily_revenue: [AdminDailyRevenue]?
+    let dailyRevenue: [AdminDailyRevenue]
     let totals: AdminAnalyticsTotals?
-    let churn_users: [AdminGenericRow]?
-    let churn_count: Int?
-    let churn_note: String?
+    var byService: [AdminByServiceRow]?
+    var byStatus: [AdminByStatusRow]?
+    let churn: AdminChurn
+
+    /// Legacy accessors kept so existing call sites keep working.
+    var daily_revenue: [AdminDailyRevenue]? { dailyRevenue.isEmpty ? nil : dailyRevenue }
+    var churn_users: [AdminGenericRow]? { churn.users.isEmpty ? nil : churn.users }
+    var churn_count: Int? { churn.count }
+    var churn_note: String? { churn.note }
+
+    enum CodingKeys: String, CodingKey {
+        case ok, days, service, status
+        case revenue_by_day, daily_revenue
+        case totals
+        case by_service, top_services
+        case by_status
+        case churn, churn_users, churn_count, churn_note
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try container.decodeIfPresent(Bool.self, forKey: .ok) ?? false
+        days = container.adminInt(forKey: .days)
+        // Tolerant on purpose: the backend's extras overwrite the
+        // echoed "status" string with a labels-and-data object, so
+        // a strict String decode here would throw and blank the
+        // whole screen. A mismatched type reads as nil instead.
+        service = (try? container.decodeIfPresent(String.self, forKey: .service)) ?? nil
+        status = (try? container.decodeIfPresent(String.self, forKey: .status)) ?? nil
+        let newDays = try container.decodeIfPresent([AdminDailyRevenue].self, forKey: .revenue_by_day)
+        let oldDays = try container.decodeIfPresent([AdminDailyRevenue].self, forKey: .daily_revenue)
+        dailyRevenue = newDays ?? oldDays ?? []
+        totals = try container.decodeIfPresent(AdminAnalyticsTotals.self, forKey: .totals)
+        var serviceRows = try container.decodeIfPresent([AdminByServiceRow].self, forKey: .by_service)
+        if serviceRows == nil,
+           let series = try container.decodeIfPresent(AdminLabelledSeries.self, forKey: .top_services),
+           let labels = series.labels, let data = series.data {
+            serviceRows = zip(labels, data).map { AdminByServiceRow(service: $0, revenue: Int($1), orders: nil) }
+        }
+        byService = serviceRows
+        var statusRows = try container.decodeIfPresent([AdminByStatusRow].self, forKey: .by_status)
+        if statusRows == nil,
+           let series = try container.decodeIfPresent(AdminLabelledSeries.self, forKey: .status),
+           let labels = series.labels, let data = series.data {
+            statusRows = zip(labels, data).map { AdminByStatusRow(status: $0, count: Int($1), revenue: nil) }
+        }
+        byStatus = statusRows
+        if let churnValue = try? container.decodeIfPresent(AdminChurn.self, forKey: .churn),
+           let churnValue {
+            churn = churnValue
+        } else {
+            let users = try container.decodeIfPresent([AdminGenericRow].self, forKey: .churn_users) ?? []
+            let count = container.adminInt(forKey: .churn_count)
+            let note = try container.decodeIfPresent(String.self, forKey: .churn_note)
+            let hasLegacyKeys = (try? container.decodeIfPresent([AdminGenericRow].self, forKey: .churn_users)) != nil
+                || count != nil || note != nil
+            if hasLegacyKeys {
+                // The older backend returns an empty list with a note
+                // when the real list could not be built: that is an
+                // unavailable metric, not zero churn.
+                if users.isEmpty, let note, !note.isEmpty {
+                    churn = AdminChurn(available: false, count: nil, users: [], note: note)
+                } else {
+                    churn = AdminChurn(available: true, count: count ?? users.count, users: users, note: note)
+                }
+            } else {
+                churn = .unavailable
+            }
+        }
+    }
 }
 
 struct AdminAnalyticsRootView: View {
@@ -155,7 +473,7 @@ struct AdminAnalyticsRootView: View {
                         .foregroundStyle(.psMuted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let errorMessage {
+            } else if let errorMessage, response == nil {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
@@ -180,8 +498,15 @@ struct AdminAnalyticsRootView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 filters
+                if let errorMessage, response != nil {
+                    Text(errorMessage)
+                        .font(.psCaption)
+                        .foregroundStyle(.psDanger)
+                }
                 totalsSection
                 revenueSection
+                byServiceSection
+                byStatusSection
                 churnSection
                 exportSection
                 if let exportError {
@@ -192,6 +517,7 @@ struct AdminAnalyticsRootView: View {
             }
             .psScreenPadding()
         }
+        .scrollIndicators(.hidden)
     }
 
     private var filters: some View {
@@ -232,8 +558,14 @@ struct AdminAnalyticsRootView: View {
                     Text("Revenue")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
-                    Text("KES \(response?.totals?.revenue ?? 0)")
-                        .font(.psHeadline)
+                    if let revenue = response?.totals?.revenue {
+                        Text("KES \(revenue)")
+                            .font(.psHeadline)
+                    } else {
+                        Text("Not available yet")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -242,8 +574,14 @@ struct AdminAnalyticsRootView: View {
                     Text("Orders")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
-                    Text("\(response?.totals?.orders ?? 0)")
-                        .font(.psHeadline)
+                    if let orders = response?.totals?.orders {
+                        Text("\(orders)")
+                            .font(.psHeadline)
+                    } else {
+                        Text("Not available yet")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -254,14 +592,22 @@ struct AdminAnalyticsRootView: View {
         PSCard {
             VStack(alignment: .leading, spacing: 12) {
                 PSSectionHeader(title: "Daily revenue")
-                let rows = response?.daily_revenue ?? []
-                if rows.isEmpty {
+                let allRows = response?.dailyRevenue ?? []
+                // A 90-day chart of 90 bars is unreadable, so the
+                // chart shows the most recent 14 days and says so.
+                let rows = allRows.count > 14 ? Array(allRows.suffix(14)) : allRows
+                if allRows.isEmpty {
                     PSEmptyState(
                         systemImage: "chart.bar.fill",
                         title: "No revenue in this range",
                         body: "No ledger entries match the selected days, service and status."
                     )
                 } else {
+                    if allRows.count > 14 {
+                        Text("Showing the most recent 14 days of \(allRows.count).")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
                     let maxRevenue = max(1, rows.map { $0.revenue ?? 0 }.max() ?? 1)
                     HStack(alignment: .bottom, spacing: 6) {
                         ForEach(rows, id: \.day) { row in
@@ -288,21 +634,76 @@ struct AdminAnalyticsRootView: View {
         }
     }
 
+    private var byServiceSection: some View {
+        PSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PSSectionHeader(title: "Revenue by service")
+                if let rows = response?.byService {
+                    if rows.isEmpty {
+                        Text("No revenue by service in this range.")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
+                    ForEach(rows, id: \.service_requested) { row in
+                        AdminKVRow(
+                            label: "\(row.service_requested ?? "Service") (\(row.orders ?? 0) orders)",
+                            value: "KES \(row.revenue ?? 0)"
+                        )
+                    }
+                } else {
+                    Text("Not available yet")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                }
+            }
+        }
+    }
+
+    private var byStatusSection: some View {
+        PSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PSSectionHeader(title: "Subscriptions by status")
+                if let rows = response?.byStatus {
+                    if rows.isEmpty {
+                        Text("No subscriptions by status yet.")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
+                    ForEach(rows) { row in
+                        AdminKVRow(
+                            label: row.status,
+                            value: "\(row.count)"
+                        )
+                    }
+                } else {
+                    Text("Not available yet")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                }
+            }
+        }
+    }
+
     private var churnSection: some View {
         PSCard {
             VStack(alignment: .leading, spacing: 12) {
                 PSSectionHeader(title: "Churn risk")
-                let users = response?.churn_users ?? []
-                if users.isEmpty {
-                    PSEmptyState(
-                        systemImage: "person.crop.circle.badge.xmark",
-                        title: "No churn list yet",
-                        body: response?.churn_note ?? "Churn is a stub on the web: the live endpoint returns an empty list until the backend computes the real list. Nothing is shown here rather than invented churn data."
-                    )
-                } else {
-                    Text("\(response?.churn_count ?? users.count) customers at risk")
+                if response == nil {
+                    Text("Not available yet")
                         .font(.psBody)
-                    ForEach(users) { user in
+                        .foregroundStyle(.psMuted)
+                } else if let churn = response?.churn, !churn.available {
+                    Text(churn.note ?? "Churn is not available yet.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                } else if let churn = response?.churn, churn.users.isEmpty {
+                    Text("No customers at risk right now.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                } else if let churn = response?.churn {
+                    Text("\(churn.count ?? churn.users.count) customers at risk")
+                        .font(.psBody)
+                    ForEach(churn.users) { user in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(user.first("name", "email") ?? "Customer")
                                 .font(.psHeadline)
@@ -365,10 +766,19 @@ struct AdminAnalyticsRootView: View {
             query += "&service=\(trimmedService.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmedService)"
         }
         do {
-            let result: AdminAnalyticsResponse = try await APIClient.shared.fetchJSON(query)
+            var result: AdminAnalyticsResponse = try await APIClient.shared.fetchJSON(query)
             guard result.ok else {
                 errorMessage = "Admin needs the live API. The analytics endpoint did not return data."
                 return
+            }
+            // The older backend keeps revenue by service only in the
+            // financial engine, not in analytics: fill it from there
+            // so the section shows real numbers instead of
+            // "Not available yet" when the data does exist.
+            if result.byService == nil,
+               let engine: AdminFinancialEngineResponse = try? await APIClient.shared.fetchJSON("api/v1/admin/financial-engine"),
+               engine.ok {
+                result.byService = engine.by_service
             }
             response = result
         } catch {
@@ -417,6 +827,29 @@ struct AdminByServiceRow: Decodable {
     let service_requested: String?
     let revenue: Int?
     let orders: Int?
+
+    init(service: String, revenue: Int?, orders: Int?) {
+        self.service_requested = service
+        self.revenue = revenue
+        self.orders = orders
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case service_requested, service, name, revenue, total, monthly_recurring, orders, count, n
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        service_requested = try container.decodeIfPresent(String.self, forKey: .service_requested)
+            ?? container.decodeIfPresent(String.self, forKey: .service)
+            ?? container.decodeIfPresent(String.self, forKey: .name)
+        revenue = container.adminInt(forKey: .revenue)
+            ?? container.adminInt(forKey: .total)
+            ?? container.adminInt(forKey: .monthly_recurring)
+        orders = container.adminInt(forKey: .orders)
+            ?? container.adminInt(forKey: .count)
+            ?? container.adminInt(forKey: .n)
+    }
 }
 
 struct AdminWalletActionRow: Decodable {
@@ -517,6 +950,7 @@ struct AdminFinancialEngineView: View {
             }
             .psScreenPadding()
         }
+        .scrollIndicators(.hidden)
     }
 
     private func engineCard(label: String, value: String) -> some View {

@@ -16,6 +16,7 @@ struct AuthView: View {
 
     @State private var showClerkSignIn = false
     @State private var showClerkSignUp = false
+    @State private var showPasskey = false
     @State private var showForgot = false
     @State private var showMagic = false
 
@@ -45,7 +46,19 @@ struct AuthView: View {
                             showClerkSignUp = true
                         } label: {
                             Text("Create account")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.psHeadline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.psCyan)
+                        .controlSize(.large)
+
+                        Button {
+                            showPasskey = true
+                        } label: {
+                            Label("Sign in with a passkey", systemImage: "key.fill")
+                                .font(.psHeadline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 13)
                         }
@@ -73,6 +86,7 @@ struct AuthView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle("Sign in")
@@ -83,7 +97,7 @@ struct AuthView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.psHeadline)
                             .foregroundStyle(.psMuted)
                             .frame(width: 44, height: 44)
                     }
@@ -104,6 +118,10 @@ struct AuthView: View {
             }
             .sheet(isPresented: $showForgot) { ForgotPasswordView().psSheetDetents() }
             .sheet(isPresented: $showMagic) { MagicLinkView().psSheetDetents() }
+            .sheet(isPresented: $showPasskey) { PasskeySignInView().psSheetDetents() }
+            .onChange(of: appState.isLoggedIn) { _, loggedIn in
+                if loggedIn { dismiss() }
+            }
         }
     }
 }
@@ -153,6 +171,7 @@ private struct ForgotPasswordView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
             .onTapGesture { emailFocused = false }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
@@ -230,6 +249,7 @@ private struct MagicLinkView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
             .onTapGesture { emailFocused = false }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)

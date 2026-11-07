@@ -21,11 +21,11 @@ struct SlotCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(platform.name)
-                    .font(.psHeadline)
+                    .psTextStyle(.headline)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                 Text(platform.tagline)
-                    .font(.psCaption)
+                    .psTextStyle(.caption)
                     .foregroundStyle(.psMuted)
                     .lineLimit(2)
             }
@@ -35,13 +35,13 @@ struct SlotCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(platform.formattedPrice)
-                        .font(.system(size: 17, weight: .semibold))
+                        .psTextStyle(.headline)
                     Text("per slot")
-                        .font(.psCaption)
+                        .psTextStyle(.caption)
                         .foregroundStyle(.psMuted)
                 }
                 Text(platform.duration)
-                    .font(.psCaption)
+                    .psTextStyle(.caption)
                     .foregroundStyle(.psMuted)
 
                 if platform.isSoldOut {
@@ -52,7 +52,7 @@ struct SlotCard: View {
                             isOnWaitlist ? "On waitlist" : "Join waitlist",
                             systemImage: isOnWaitlist ? "checkmark.circle.fill" : "bell.fill"
                         )
-                        .font(.psCaption)
+                        .psTextStyle(.caption)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                     }
@@ -100,7 +100,7 @@ struct SlotCard: View {
                     .background(Color.psSuccess.opacity(0.12))
             }
         }
-        .font(.psCaption)
+        .psTextStyle(.caption)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .clipShape(Capsule())

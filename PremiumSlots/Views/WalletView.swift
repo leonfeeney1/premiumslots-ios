@@ -158,7 +158,7 @@ struct WalletRootView: View {
                         WalletStatementView()
                     } label: {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 20))
+                            .font(.psIcon)
                     }
                     .accessibilityLabel("Wallet statement")
                 }
@@ -412,7 +412,7 @@ struct PSWalletTxnRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: isCredit ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                .font(.system(size: 20))
+                .font(.psIcon)
                 .foregroundStyle(isCredit ? .psSuccess : .psMuted)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
@@ -579,7 +579,7 @@ struct WalletPayInstructionRow: View {
                 UIPasteboard.general.string = value
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 20))
+                    .font(.psIcon)
             }
             .accessibilityLabel("Copy \(label) \(value)")
         }
@@ -628,7 +628,7 @@ struct WalletStatementView: View {
                         PSRingSpinner(diameter: 20, lineWidth: 2)
                     } else {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 20))
+                            .font(.psIcon)
                     }
                 }
                 .disabled(pdfBusy)

@@ -104,7 +104,7 @@ struct PlatformDetailView: View {
                 .font(.psCaption)
                 .foregroundStyle(.psMuted)
             Text(value)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.psButton)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -117,7 +117,7 @@ struct PlatformDetailView: View {
     private func benefitRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.psIcon)
                 .foregroundStyle(.psCyan)
                 .frame(width: 22)
             Text(text)

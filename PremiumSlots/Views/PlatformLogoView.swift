@@ -182,8 +182,8 @@ struct PlatformLogoView: View {
                     .background(Color.psSurface)
             } else {
                 Text(PlatformLogoResolver.initials(for: name))
-                    .font(.system(size: size * 0.34, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.psMonogram(for: size))
+                    .foregroundStyle(.psPaper)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(PlatformLogoResolver.brandColor(for: name))
             }

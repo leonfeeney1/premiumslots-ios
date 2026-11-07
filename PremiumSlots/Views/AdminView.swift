@@ -29,6 +29,7 @@ struct AdminView: View {
                 .padding(.vertical, 12)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .scrollIndicators(.hidden)
             .background(Color.psBackground)
             .navigationTitle("Admin")
             .navigationBarTitleDisplayMode(.inline)
@@ -260,7 +261,7 @@ struct AdminView: View {
                 .font(.psCaption)
                 .foregroundStyle(.psMuted)
             Text("\(value)")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.psTitle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
@@ -306,11 +307,14 @@ struct AdminView: View {
                         Spacer()
                         Text(sub.status)
                             .font(.psCaption)
-                            .foregroundStyle(sub.status == "Approved" ? .green : .psAmber)
+                            .foregroundStyle(sub.status == "Approved" ? .psSuccess : .psAmber)
                     }
                     Text("Order #\(sub.id) · KES \(sub.amount_due) · code \(sub.mpesa_code ?? "-")")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
+                    Text("\(adminDaysLeftText(expiryDate: sub.expiry_date, apiDays: nil)) · expires \(adminShortDate(sub.expiry_date))")
+                        .font(.psCaption)
+                        .foregroundStyle(adminDaysLeftTint(expiryDate: sub.expiry_date, apiDays: nil))
                 }
                 .padding(12)
                 .background(Color.psSurface)
@@ -349,7 +353,7 @@ struct AdminView: View {
                     }
                     .font(.psCaption)
                     .buttonStyle(.bordered)
-                    .tint(customer.is_banned == true ? .green : .red)
+                    .tint(customer.is_banned == true ? .psSuccess : .psDanger)
                 }
                 .padding(12)
                 .background(Color.psSurface)
@@ -446,7 +450,7 @@ struct ApproveCard: View {
                 HStack(spacing: 10) {
                     Button("Approve") { showApprove = true }
                         .buttonStyle(.borderedProminent)
-                        .tint(.psPrimary)
+                        .tint(.psSuccess)
                         .font(.psCaption)
                     Button("Reject", role: .destructive) {
                         Task { await reject() }

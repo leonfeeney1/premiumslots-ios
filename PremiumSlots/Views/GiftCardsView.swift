@@ -147,7 +147,7 @@ struct GiftCardsRootView: View {
                     PSEmptyState(
                         systemImage: "gift.fill",
                         title: "Gift cards are off",
-                        body: "The gift card feature is turned off on premiumslots.tech right now. Check back later.",
+                        body: "The gift card feature is turned off right now. Check back later.",
                         actionLabel: "Try again"
                     ) {
                         Task { await load() }
@@ -166,7 +166,7 @@ struct GiftCardsRootView: View {
                         showVerify = true
                     } label: {
                         Image(systemName: "checkmark.shield")
-                            .font(.system(size: 20))
+                            .font(.psIcon)
                     }
                     .accessibilityLabel("Verify a gift card code")
                 }
@@ -308,7 +308,7 @@ struct GiftCardRow: View {
                         .accessibilityHidden(true)
                 } else {
                     Image(systemName: "gift.fill")
-                        .font(.system(size: 20))
+                        .font(.psIcon)
                         .foregroundStyle(.psMuted)
                         .accessibilityHidden(true)
                 }
@@ -331,7 +331,7 @@ struct GiftCardRow: View {
                         UIPasteboard.general.string = code
                     } label: {
                         Image(systemName: "doc.on.doc")
-                            .font(.system(size: 20))
+                            .font(.psIcon)
                     }
                     .accessibilityLabel("Copy gift card code \(code)")
                 }
@@ -481,7 +481,7 @@ struct GiftCardCreateSheet: View {
                                         UIPasteboard.general.string = createdCode
                                     } label: {
                                         Image(systemName: "doc.on.doc")
-                                            .font(.system(size: 20))
+                                            .font(.psIcon)
                                     }
                                     .accessibilityLabel("Copy gift card code \(createdCode)")
                                 }

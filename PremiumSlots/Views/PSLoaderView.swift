@@ -111,7 +111,7 @@ struct PSLoaderView: View {
                 .padding(.bottom, 24)
 
                 Text("ESTABLISHING CONNECTION")
-                    .font(.system(size: 14, weight: .bold, design: .default))
+                    .font(.psHUDLabel)
                     .tracking(4.2)
                     .foregroundStyle(Color(red: 0.50, green: 0.80, blue: 1.00))
                     .shadow(color: Color(red: 0.18, green: 0.61, blue: 0.90).opacity(0.5), radius: 8)

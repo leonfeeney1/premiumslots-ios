@@ -1,19 +1,39 @@
 import SwiftUI
 
-// MARK: - My Slots, v3 Fix #3
-// HIG overhaul: inset-grouped List with Active / Pending / Past
-// sections, pull-to-refresh, shared empty/error states, status
-// pills, sheet detents for the vault reveal. Vault details are
-// still shown once only, exactly as on the web.
+// MARK: - My Slots, v5
+// Complete overhaul: bigger slot cards (large platform logo, name,
+// price, status pill, expiry plus days remaining), more detail per
+// slot (start date, renewal date, auto-renew state, support
+// shortcut), and a clearer button layout (one prominent primary
+// action, secondary actions grouped, the destructive choice of
+// turning auto-renew off behind its own confirmation, in red).
+// Active / Pending verification / Past split kept. Pull-to-refresh
+// and proper empty/error states. Days remaining prefers the server
+// value (days_remaining) when the API returns it and falls back to
+// a local calculation from the expiry date; display is never
+// negative. There is no customer cancel endpoint on the API, so no
+// Cancel button was invented.
+//
+// Safe area: the screen lives in a NavigationStack with an inline
+// title, so content starts below the notch and Dynamic Island on
+// first appearance and only scrolls under the bar once the user
+// scrolls. The navigation bar background is an opaque brand colour
+// so scrolled content never shows through behind the notch. No
+// ignoresSafeArea is used on this screen.
 
 struct MySlotsView: View {
     @EnvironmentObject private var appState: AppState
+    var onBrowseCatalogue: () -> Void = {}
+
     @State private var showAuth = false
     @State private var vault = ""
     @State private var vaultError = ""
-    @State private var isRevealingVault = false
+    @State private var revealingId: Int?
     @State private var loadError: String?
+    @State private var actionError: String?
     @State private var selectedSubscription: LiveSubscription?
+    @State private var extras: [Int: PSSubscriptionExtras] = [:]
+    @State private var reportedIds: Set<Int> = []
 
     private var activeSubs: [LiveSubscription] {
         appState.liveSubscriptions.filter { $0.status == "Approved" }
@@ -45,11 +65,10 @@ struct MySlotsView: View {
                     PSEmptyState(
                         systemImage: "lock.shield",
                         title: "No slots yet",
-                        body: "Slots you buy on premiumslots.tech appear here once your M-PESA code is verified. Pending orders show here too.",
-                        actionLabel: "Browse the catalogue"
-                    ) {
-                        // The tab bar takes the user back to Catalogue.
-                    }
+                        body: "Slots you buy on the PremiumSlots website appear here once your M-PESA code is verified. Pending orders show here too.",
+                        actionLabel: "Browse the catalogue",
+                        action: onBrowseCatalogue
+                    )
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 } else {
@@ -89,7 +108,7 @@ struct MySlotsView: View {
                                 Text("Wallet balance")
                                 Spacer()
                                 Text("KES \(balance)")
-                                    .font(.psMono)
+                                    .psTextStyle(.mono)
                                     .foregroundStyle(.psMuted)
                             }
                         }
@@ -107,11 +126,17 @@ struct MySlotsView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .psHiddenScrollIndicators()
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
             .background(Color.psBackground)
             .navigationTitle("My Slots")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.psBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) { CustomerNotificationBell() }
+            }
             .refreshable { await load() }
             .task { await load() }
             .sheet(isPresented: $showAuth) {
@@ -119,8 +144,18 @@ struct MySlotsView: View {
                     .psSheetDetents()
             }
             .sheet(item: $selectedSubscription) { sub in
-                SubscriptionDetailSheet(subscription: sub)
-                    .psSheetDetents()
+                SubscriptionDetailSheet(
+                    subscription: sub,
+                    extras: extras[sub.id],
+                    onAutoRenewChanged: { value in
+                        extras[sub.id] = PSSubscriptionExtras(
+                            id: sub.id,
+                            days_remaining: extras[sub.id]?.days_remaining,
+                            auto_renew: value
+                        )
+                    }
+                )
+                .psSheetDetents()
             }
             .alert("Vault", isPresented: Binding(
                 get: { !vault.isEmpty || !vaultError.isEmpty },
@@ -130,6 +165,14 @@ struct MySlotsView: View {
             } message: {
                 Text(vaultError.isEmpty ? vault : vaultError)
             }
+            .alert("Something went wrong", isPresented: Binding(
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(actionError ?? "")
+            }
             .safeAreaPadding(.bottom, 8)
         }
     }
@@ -138,15 +181,31 @@ struct MySlotsView: View {
         loadError = nil
         await appState.refreshMySubscriptions()
         await appState.refreshWallet()
+        do {
+            extras = try await appState.api.mySubscriptionExtras()
+        } catch {
+            extras = [:]
+        }
+    }
+
+    /// Server days remaining when the API returns it, otherwise the
+    /// local day difference from the expiry date. Nil when there is
+    /// no expiry date at all.
+    private func daysRemaining(for sub: LiveSubscription) -> Int? {
+        extras[sub.id]?.days_remaining ?? sub.daysLeft
+    }
+
+    private func autoRenew(for sub: LiveSubscription) -> Bool? {
+        extras[sub.id]?.auto_renew
     }
 
     private var loginGate: some View {
         PSCard {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Sign in to see your slots")
-                    .font(.psTitle)
-                Text("Your subscriptions live on your PremiumSlots account, not on this phone. Sign in to load them from premiumslots.tech.")
-                    .font(.psBody)
+                    .psTextStyle(.title)
+                Text("Your subscriptions live on your PremiumSlots account, not on this phone. Sign in to load them from the PremiumSlots website.")
+                    .psTextStyle(.body)
                     .foregroundStyle(.psMuted)
                 Button("Sign in") { showAuth = true }
                     .psPrimary()
@@ -154,79 +213,179 @@ struct MySlotsView: View {
         }
     }
 
+    // MARK: - Slot card
+
     private func liveSlotCard(_ sub: LiveSubscription) -> some View {
         PSCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    PlatformLogoView(name: sub.serviceRequested, size: 48)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 14) {
+                    PlatformLogoView(name: sub.serviceRequested, size: 64)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(sub.serviceRequested)
-                            .font(.psHeadline)
-                        Text("Order #\(sub.id) · KES \(sub.amountDue)")
-                            .font(.psCaption)
+                            .psTextStyle(.headline)
+                            .lineLimit(2)
+                        Text("KES \(sub.amountDue)")
+                            .psTextStyle(.headline)
+                        + Text(" · Order #\(sub.id)")
+                            .psTextStyle(.caption)
                             .foregroundStyle(.psMuted)
+                        if let locked = sub.lockedPrice, locked != sub.amountDue {
+                            Text("Locked price KES \(locked)")
+                                .psTextStyle(.caption)
+                                .foregroundStyle(.psMuted)
+                        }
                     }
                     Spacer()
                     PSStatusPill(
                         text: sub.orderStatus.rawValue,
                         systemImage: sub.orderStatus.systemImage,
-                        tint: sub.orderStatus == .active ? .psSuccess : .psAmber
+                        tint: sub.orderStatus == .active ? .psSuccess : sub.orderStatus == .issue ? .psDanger : .psAmber
                     )
                 }
+
                 HStack(spacing: 6) {
                     Image(systemName: "calendar")
-                        .font(.psCaption)
+                        .psTextStyle(.caption)
                         .foregroundStyle(.psMuted)
                         .accessibilityHidden(true)
-                    if let expiry = formattedDate(sub.expiryDate) {
-                        Text("Expires \(expiry)")
-                            .font(.psCaption)
-                            .foregroundStyle(.psMuted)
-                    } else {
-                        Text("No expiry date shown")
-                            .font(.psCaption)
-                            .foregroundStyle(.psMuted)
-                    }
-                    if let days = sub.daysLeft, sub.status == "Approved" {
-                        Text("· \(days >= 0 ? "\(days) days left" : "Expired")")
-                            .font(.psCaption)
-                            .foregroundStyle(.psMuted)
-                    }
+                    Text(expiryLabel(for: sub))
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
+                    Spacer()
+                    daysPill(for: sub)
                 }
+
+                if let line = detailLine(for: sub) {
+                    Text(line)
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
+                }
+
                 if sub.status == "Approved" {
+                    Button {
+                        Task { await revealVault(for: sub) }
+                    } label: {
+                        if revealingId == sub.id {
+                            PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7)
+                        } else {
+                            Label("Show vault details", systemImage: "lock.shield.fill")
+                        }
+                    }
+                    .psPrimary()
+                    .disabled(revealingId != nil)
+                    .accessibilityLabel("Show vault details for \(sub.serviceRequested)")
                     HStack(spacing: 10) {
-                        Button {
-                            Task { await revealVault(for: sub) }
-                        } label: {
-                            if isRevealingVault {
-                                PSRingSpinner(diameter: 20, lineWidth: 2)
-                            } else {
-                                Label("Show vault details", systemImage: "lock.shield.fill")
-                                    .font(.psCaption)
+                        if reportedIds.contains(sub.id) || sub.issueReported {
+                            Label("Issue reported", systemImage: "checkmark.circle.fill")
+                                .psTextStyle(.caption)
+                                .foregroundStyle(.psMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        } else {
+                            Button {
+                                Task { await reportIssue(for: sub) }
+                            } label: {
+                                Label("Report an issue", systemImage: "exclamationmark.circle")
+                                    .psTextStyle(.caption)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
                             }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Report an issue with \(sub.serviceRequested)")
+                        }
+                        Link(destination: PSContact.whatsAppSupportURL) {
+                            Label("Support", systemImage: "message.fill")
+                                .psTextStyle(.caption)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.bordered)
                         .tint(.psCyan)
-                        .disabled(isRevealingVault)
-                        .accessibilityLabel("Show vault details for \(sub.serviceRequested)")
-                        Button {
-                            Task { try? await appState.api.reportIssue(subscriptionId: sub.id) }
-                        } label: {
-                            Label("Report an issue", systemImage: "exclamationmark.circle")
-                                .font(.psCaption)
+                        .accessibilityLabel("WhatsApp support, \(PSContact.whatsAppDisplayNumber)")
+                    }
+                    Button("Details and timeline") { selectedSubscription = sub }
+                        .psTextStyle(.caption)
+                } else if sub.status == "Pending" || sub.status == "Initiated" {
+                    Text("Your M-PESA code is waiting to be verified by the team.")
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
+                    HStack(spacing: 10) {
+                        Button("Details and timeline") { selectedSubscription = sub }
+                            .psTextStyle(.caption)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .buttonStyle(.bordered)
+                        Link(destination: PSContact.whatsAppSupportURL) {
+                            Label("Support", systemImage: "message.fill")
+                                .psTextStyle(.caption)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityLabel("Report an issue with \(sub.serviceRequested)")
+                        .tint(.psCyan)
+                        .accessibilityLabel("WhatsApp support, \(PSContact.whatsAppDisplayNumber)")
                     }
-                } else if sub.status == "Pending" {
-                    Text("Your M-PESA code is waiting to be verified by the team.")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
+                } else {
+                    Button("Buy again", action: onBrowseCatalogue)
+                        .psPrimary()
+                    HStack(spacing: 10) {
+                        Button("Details and timeline") { selectedSubscription = sub }
+                            .psTextStyle(.caption)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .buttonStyle(.bordered)
+                        Link(destination: PSContact.whatsAppSupportURL) {
+                            Label("Support", systemImage: "message.fill")
+                                .psTextStyle(.caption)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.psCyan)
+                        .accessibilityLabel("WhatsApp support, \(PSContact.whatsAppDisplayNumber)")
+                    }
                 }
-                Button("Details and timeline") { selectedSubscription = sub }
-                    .font(.psCaption)
             }
         }
+    }
+
+    /// "Renews <date>" when auto-renew is on for an active slot,
+    /// otherwise "Expires <date>".
+    private func expiryLabel(for sub: LiveSubscription) -> String {
+        guard let date = formattedDate(sub.expiryDate) else {
+            return "No expiry date shown"
+        }
+        if sub.status == "Approved", autoRenew(for: sub) == true {
+            return "Renews \(date)"
+        }
+        return "Expires \(date)"
+    }
+
+    @ViewBuilder
+    private func daysPill(for sub: LiveSubscription) -> some View {
+        if sub.status == "Approved", let days = daysRemaining(for: sub) {
+            if days < 0 {
+                PSStatusPill(text: "Expired", systemImage: "xmark.circle.fill", tint: .psDanger)
+            } else if days == 0 {
+                PSStatusPill(text: "Expires today", systemImage: "clock.fill", tint: .psWarning)
+            } else {
+                PSStatusPill(text: PSDaysRemaining.text(days: days), systemImage: "clock.fill", tint: .psSuccess)
+            }
+        }
+    }
+
+    /// Start date and auto-renew state, shown only when known.
+    /// Nothing is shown for a value the server did not return.
+    private func detailLine(for sub: LiveSubscription) -> String? {
+        var parts: [String] = []
+        if let started = formattedDate(sub.createdAt) {
+            parts.append("Started \(started)")
+        }
+        if let renew = autoRenew(for: sub) {
+            parts.append(renew ? "Auto-renew on" : "Auto-renew off")
+        }
+        if parts.isEmpty { return nil }
+        return parts.joined(separator: " · ")
     }
 
     private func orderRow(_ order: SlotOrder) -> some View {
@@ -236,9 +395,9 @@ struct MySlotsView: View {
                     PlatformLogoView(name: order.platformName, size: 48)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(order.platformName)
-                            .font(.psHeadline)
+                            .psTextStyle(.headline)
                         Text("KES \(order.amountKES) · \(order.mpesaCode)")
-                            .font(.psCaption)
+                            .psTextStyle(.caption)
                             .foregroundStyle(.psMuted)
                     }
                     Spacer()
@@ -250,15 +409,15 @@ struct MySlotsView: View {
                 }
                 HStack(spacing: 6) {
                     Image(systemName: "calendar")
-                        .font(.psCaption)
+                        .psTextStyle(.caption)
                         .foregroundStyle(.psMuted)
                         .accessibilityHidden(true)
                     Text("Started \(shortDate(order.createdAt))")
-                        .font(.psCaption)
+                        .psTextStyle(.caption)
                         .foregroundStyle(.psMuted)
                     if let activatedAt = order.activatedAt {
                         Text("· Active since \(shortDate(activatedAt))")
-                            .font(.psCaption)
+                            .psTextStyle(.caption)
                             .foregroundStyle(.psMuted)
                     }
                 }
@@ -285,8 +444,8 @@ struct MySlotsView: View {
     }
 
     private func revealVault(for sub: LiveSubscription) async {
-        isRevealingVault = true
-        defer { isRevealingVault = false }
+        revealingId = sub.id
+        defer { revealingId = nil }
         do {
             let response = try await appState.api.vault(subscriptionId: sub.id)
             guard response.ok else {
@@ -303,20 +462,53 @@ struct MySlotsView: View {
             vaultError = error.localizedDescription
         }
     }
+
+    private func reportIssue(for sub: LiveSubscription) async {
+        do {
+            try await appState.api.reportIssue(subscriptionId: sub.id)
+            reportedIds.insert(sub.id)
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
 }
 
-// MARK: - Subscription detail sheet (timeline + request-review, Fix #4)
+// MARK: - Subscription detail sheet (timeline + request-review, Fix #4;
+// v5: start/renewal dates, auto-renew toggle, support actions)
 // Timeline from GET /api/v1/me/subscriptions/<id>/timeline (OrderEvents);
 // request-review via POST /api/v1/me/subscriptions/<id>/request-review.
+// Auto-renew uses POST /api/v1/subscription/<id>/toggle-auto-renew,
+// which flips the server flag and returns the new value. The toggle
+// is shown only when the server reported the current state; turning
+// it off asks for confirmation with a destructive button, kept
+// separate from every other action.
 
 struct SubscriptionDetailSheet: View {
     let subscription: LiveSubscription
+    let extras: PSSubscriptionExtras?
+    var onAutoRenewChanged: ((Bool) -> Void)?
+
     @Environment(\.dismiss) private var dismiss
+    @State private var autoRenewState: Bool?
+    @State private var isTogglingAutoRenew = false
+    @State private var showDisableConfirm = false
+    @State private var autoRenewMessage: String?
     @State private var timeline: [TmlEvent] = []
     @State private var isLoadingTimeline = false
     @State private var timelineError: String?
     @State private var reviewMessage: String?
     @State private var isRequestingReview = false
+    @State private var issueReported: Bool
+    @State private var issueMessage: String?
+    @State private var isReportingIssue = false
+
+    init(subscription: LiveSubscription, extras: PSSubscriptionExtras? = nil, onAutoRenewChanged: ((Bool) -> Void)? = nil) {
+        self.subscription = subscription
+        self.extras = extras
+        self.onAutoRenewChanged = onAutoRenewChanged
+        _autoRenewState = State(initialValue: extras?.auto_renew)
+        _issueReported = State(initialValue: subscription.issueReported)
+    }
 
     var body: some View {
         NavigationStack {
@@ -332,7 +524,7 @@ struct SubscriptionDetailSheet: View {
                         Text("Order")
                         Spacer()
                         Text("#\(subscription.id)")
-                            .font(.psMono)
+                            .psTextStyle(.mono)
                             .foregroundStyle(.psMuted)
                     }
                     HStack {
@@ -355,14 +547,77 @@ struct SubscriptionDetailSheet: View {
                         Text(subscription.status)
                             .foregroundStyle(.psMuted)
                     }
-                    if let expiry = subscription.expiryDate {
+                    if let started = formattedDate(subscription.createdAt) {
                         HStack {
-                            Text("Expires")
+                            Text("Started")
                             Spacer()
-                            Text(expiry)
-                                .font(.psMono)
+                            Text(started)
                                 .foregroundStyle(.psMuted)
                         }
+                    }
+                    if let expiry = formattedDate(subscription.expiryDate) {
+                        HStack {
+                            Text(autoRenewState == true ? "Renews on" : "Expires on")
+                            Spacer()
+                            Text(expiry)
+                                .foregroundStyle(.psMuted)
+                        }
+                    }
+                    if let group = subscription.accountGroup, !group.isEmpty {
+                        HStack {
+                            Text("Account group")
+                            Spacer()
+                            Text(group)
+                                .foregroundStyle(.psMuted)
+                        }
+                    }
+                }
+                Section("Auto-renew") {
+                    if let _ = autoRenewState {
+                        Toggle("Auto-renew", isOn: autoRenewBinding)
+                            .disabled(isTogglingAutoRenew)
+                        Text("When auto-renew is on, your slot renews on the renewal date. When it is off, the slot ends on that date.")
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psMuted)
+                    } else {
+                        Text("Not available yet")
+                            .foregroundStyle(.psMuted)
+                        Text("The server does not report auto-renew for this slot yet.")
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    if let autoRenewMessage {
+                        Text(autoRenewMessage)
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psMuted)
+                    }
+                }
+                Section("Support") {
+                    if issueReported {
+                        Label("Issue reported", systemImage: "checkmark.circle.fill")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psMuted)
+                    } else {
+                        Button {
+                            Task { await reportIssue() }
+                        } label: {
+                            if isReportingIssue {
+                                PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7)
+                            } else {
+                                Label("Report an issue", systemImage: "exclamationmark.circle")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(isReportingIssue)
+                        .accessibilityLabel("Report an issue with \(subscription.serviceRequested)")
+                    }
+                    if let issueMessage {
+                        Text(issueMessage)
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    Link(destination: PSContact.whatsAppSupportURL) {
+                        Label("WhatsApp support (\(PSContact.whatsAppDisplayNumber))", systemImage: "message.fill")
                     }
                 }
                 Section("Timeline") {
@@ -378,21 +633,21 @@ struct SubscriptionDetailSheet: View {
                         }
                     } else if timeline.isEmpty {
                         Text("No timeline events yet.")
-                            .font(.psBody)
+                            .psTextStyle(.body)
                             .foregroundStyle(.psMuted)
                     } else {
                         ForEach(timeline) { event in
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(event.displayTitle)
-                                    .font(.psHeadline)
+                                    .psTextStyle(.headline)
                                 if let message = event.message, !message.isEmpty {
                                     Text(message)
-                                        .font(.psBody)
+                                        .psTextStyle(.body)
                                         .foregroundStyle(.psMuted)
                                 }
                                 if let date = event.created_at {
                                     Text(date)
-                                        .font(.psCaption)
+                                        .psTextStyle(.caption)
                                         .foregroundStyle(.psMuted)
                                 }
                             }
@@ -402,12 +657,12 @@ struct SubscriptionDetailSheet: View {
                 }
                 Section("Review") {
                     Text("Ask the team to request a review of this slot.")
-                        .font(.psBody)
+                        .psTextStyle(.body)
                         .foregroundStyle(.psMuted)
                     Button {
                         Task { await requestReview() }
                     } label: {
-                        if isRequestingReview { PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7) }
+                        if isRequestingReview { PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7) }
                         else { Label("Request a review", systemImage: "star.fill") }
                     }
                     .psPrimary()
@@ -415,13 +670,16 @@ struct SubscriptionDetailSheet: View {
                     .accessibilityLabel("Request a review of \(subscription.serviceRequested)")
                     if let reviewMessage {
                         Text(reviewMessage)
-                            .font(.psCaption)
+                            .psTextStyle(.caption)
                             .foregroundStyle(.psMuted)
                     }
                 }
             }
+            .psHiddenScrollIndicators()
             .navigationTitle(subscription.serviceRequested)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.psBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
@@ -429,7 +687,67 @@ struct SubscriptionDetailSheet: View {
                 }
             }
             .task { await loadTimeline() }
+            .alert("Turn off auto-renew?", isPresented: $showDisableConfirm) {
+                Button("Turn off auto-renew", role: .destructive) {
+                    Task { await applyAutoRenew(false) }
+                }
+                Button("Keep it on", role: .cancel) { }
+            } message: {
+                Text("Your slot will expire on the renewal date and will not renew. You can turn auto-renew back on any time before then.")
+            }
         }
+    }
+
+    private var autoRenewBinding: Binding<Bool> {
+        Binding(
+            get: { autoRenewState ?? false },
+            set: { newValue in
+                if newValue {
+                    Task { await applyAutoRenew(true) }
+                } else {
+                    showDisableConfirm = true
+                }
+            }
+        )
+    }
+
+    private func applyAutoRenew(_ enable: Bool) async {
+        isTogglingAutoRenew = true
+        defer { isTogglingAutoRenew = false }
+        do {
+            let value = try await APIClient.shared.toggleAutoRenew(subscriptionId: subscription.id)
+            autoRenewState = value
+            onAutoRenewChanged?(value)
+            autoRenewMessage = value
+                ? "Auto-renew is on. Your slot renews on the renewal date."
+                : "Auto-renew is off. Your slot will expire on the renewal date and will not renew."
+        } catch {
+            autoRenewMessage = error.localizedDescription
+        }
+    }
+
+    private func reportIssue() async {
+        isReportingIssue = true
+        defer { isReportingIssue = false }
+        do {
+            try await APIClient.shared.reportIssue(subscriptionId: subscription.id)
+            issueReported = true
+            issueMessage = "Thanks. The team has been told about this slot."
+        } catch {
+            issueMessage = error.localizedDescription
+        }
+    }
+
+    private func formattedDate(_ iso: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let parser = ISO8601DateFormatter()
+        if let date = parser.date(from: iso) {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .none
+            return formatter.string(from: date)
+        }
+        return iso
     }
 
     private func loadTimeline() async {

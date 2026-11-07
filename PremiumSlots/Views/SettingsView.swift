@@ -145,7 +145,7 @@ struct SettingsView: View {
                             .font(.psBody)
                     }
                     NavigationLink {
-                        ReceiptsView()
+                        ReceiptsPickerView()
                     } label: {
                         Label("Receipts", systemImage: "doc.text.fill")
                             .font(.psBody)
@@ -262,6 +262,26 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        FullPrivacyPolicyView()
+                    } label: {
+                        Label("Privacy policy", systemImage: "hand.raised.fill")
+                            .font(.psBody)
+                    }
+                    NavigationLink {
+                        FullTermsView()
+                    } label: {
+                        Label("Terms of service", systemImage: "doc.plaintext.fill")
+                            .font(.psBody)
+                    }
+                    Text("The full privacy policy and terms of service, as published on premiumslots.tech.")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                } header: {
+                    Text("Legal")
+                }
+
+                Section {
                     HStack(spacing: 12) {
                         RealLogoView(size: 44)
                         VStack(alignment: .leading) {
@@ -281,6 +301,7 @@ struct SettingsView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollIndicators(.hidden)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)

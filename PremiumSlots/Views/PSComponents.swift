@@ -11,6 +11,35 @@ import SwiftUI
 // a black or white background, so light and dark mode both work.
 // No emojis, SF Symbols only.
 
+/// Days remaining text for a subscription expiry. The server value
+/// (days_remaining) wins when present; otherwise the caller passes
+/// the locally computed day difference. Display is never negative:
+/// past expiry reads "Expired", zero reads "Expires today".
+enum PSDaysRemaining {
+    static func text(days: Int?) -> String {
+        guard let days else { return "No expiry date shown" }
+        if days < 0 { return "Expired" }
+        if days == 0 { return "Expires today" }
+        if days == 1 { return "1d left" }
+        return "\(days)d left"
+    }
+
+    /// Local fallback: whole days from now to an ISO 8601 expiry date.
+    static func days(fromExpiryDate iso: String?) -> Int? {
+        guard let iso, !iso.isEmpty else { return nil }
+        guard let date = ISO8601DateFormatter().date(from: iso) else { return nil }
+        return Calendar.current.dateComponents([.day], from: Date(), to: date).day
+    }
+}
+
+/// Real support contact, verified from the live homepage. The
+/// WhatsApp number is the support channel; the M-PESA payment
+/// number is not support and is never shown here.
+enum PSContact {
+    static let whatsAppSupportURL = URL(string: "https://wa.me/254747412440?text=Hi%20PremiumSlots%2C%20I%20need%20help%20with%20my%20subscription.")!
+    static let whatsAppDisplayNumber = "+254 747 412 440"
+}
+
 /// Standard screen padding: 16pt horizontal, 12pt vertical.
 struct PSScreenPadding: ViewModifier {
     func body(content: Content) -> some View {
@@ -22,6 +51,13 @@ struct PSScreenPadding: ViewModifier {
 
 extension View {
     func psScreenPadding() -> some View { modifier(PSScreenPadding()) }
+
+    /// Hide scroll indicators. Scroll indicators are hidden
+    /// app-wide by design, on every ScrollView and List. Other
+    /// agents: use this modifier on your scrolled views too.
+    func psHiddenScrollIndicators() -> some View {
+        scrollIndicators(.hidden)
+    }
 
     /// Standard sheet presentation: medium detent first, large
     /// available by dragging, with a visible grabber. Replaces the
@@ -67,12 +103,12 @@ struct PSSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.psHeadline)
+                .psTextStyle(.headline)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             if let actionLabel, let action {
                 Button(actionLabel, action: action)
-                    .font(.psCaption)
+                    .psTextStyle(.caption)
             }
         }
     }
@@ -97,14 +133,14 @@ struct PSEmptyState: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: systemImage)
-                .font(.system(size: 24))
+                .font(.psIconLarge)
                 .foregroundStyle(.psMuted)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.psHeadline)
+                .psTextStyle(.headline)
                 .multilineTextAlignment(.center)
             Text(message)
-                .font(.psBody)
+                .psTextStyle(.body)
                 .foregroundStyle(.psMuted)
                 .multilineTextAlignment(.center)
             if let actionLabel, let action {
@@ -128,13 +164,13 @@ struct PSErrorState: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 24))
+                .font(.psIconLarge)
                 .foregroundStyle(.psWarning)
                 .accessibilityHidden(true)
             Text("Something went wrong")
-                .font(.psHeadline)
+                .psTextStyle(.headline)
             Text(message)
-                .font(.psBody)
+                .psTextStyle(.body)
                 .foregroundStyle(.psMuted)
                 .multilineTextAlignment(.center)
             if let retry {
@@ -157,7 +193,7 @@ struct PSOfflineBanner: View {
 
     var body: some View {
         Label("Saved catalogue", systemImage: "wifi.slash")
-            .font(.psCaption)
+            .psTextStyle(.caption)
             .foregroundStyle(.psMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -172,7 +208,7 @@ struct PSLiveBanner: View {
 
     var body: some View {
         Label(message, systemImage: "checkmark.circle.fill")
-            .font(.psCaption)
+            .psTextStyle(.caption)
             .foregroundStyle(.psSuccess)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
@@ -190,7 +226,7 @@ struct PSStatusPill: View {
 
     var body: some View {
         Label(text, systemImage: systemImage)
-            .font(.psCaption)
+            .psTextStyle(.caption)
             .foregroundStyle(tint)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -203,7 +239,7 @@ struct PSStatusPill: View {
 struct PSTextFieldStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.psBody)
+            .psTextStyle(.body)
             .padding(12)
             .background(Color.psSurface)
             .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -231,7 +267,7 @@ struct PSNavigationRow<Content: View>: View {
             content
             Spacer()
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.psIconSmall)
                 .foregroundStyle(.psMuted)
                 .accessibilityHidden(true)
         }
