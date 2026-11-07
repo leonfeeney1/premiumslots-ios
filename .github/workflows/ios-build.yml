@@ -24,28 +24,27 @@ jobs:
         run: |
           xcodebuild build \
             -project PremiumSlots.xcodeproj \
-            -target PremiumSlots \
+            -scheme PremiumSlots \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Build unsigned IPA
-        # xcodebuild archive needs a shared scheme, which this hand-written
-        # project does not have, so build for a real device instead and
-        # package the resulting .app as an unsigned IPA. The .app is built
-        # with signing disabled, ready for the user to sign when sideloading.
+      - name: Archive unsigned IPA
+        # The project now ships a shared scheme
+        # (PremiumSlots.xcodeproj/xcshareddata/xcschemes/PremiumSlots.xcscheme),
+        # which xcodebuild requires when -archivePath is used.
         run: |
-          xcodebuild build \
+          xcodebuild archive \
             -project PremiumSlots.xcodeproj \
-            -target PremiumSlots \
+            -scheme PremiumSlots \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build/DerivedData \
+            -archivePath build/PremiumSlots.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO
-          APP_PATH=build/DerivedData/Build/Products/Release-iphoneos/PremiumSlots.app
-          test -d "$APP_PATH" || { echo "No .app found at $APP_PATH"; exit 1; }
+          APP_PATH=$(find build/PremiumSlots.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -n 1)
+          test -n "$APP_PATH" || { echo "No .app found in the archive"; exit 1; }
           mkdir -p build/Payload
           cp -R "$APP_PATH" build/Payload/
           cd build && zip -r PremiumSlots-unsigned.ipa Payload
