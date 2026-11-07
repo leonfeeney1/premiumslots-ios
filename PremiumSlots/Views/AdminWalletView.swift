@@ -733,7 +733,7 @@ struct AdminGiftCardsRootView: View {
     private func giftCardRow(_ card: AdminGiftCardRow) -> some View {
         let statusLower = (card.status ?? "").lowercased()
         let needsDecision = statusLower.isEmpty || statusLower == "pending"
-        VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(card.code ?? "Card #\(card.id)")
                     .font(.psMono)
