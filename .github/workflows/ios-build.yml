@@ -1,0 +1,48 @@
+name: iOS build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build PremiumSlots (unsigned)
+    runs-on: macos-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build for simulator
+        run: |
+          xcodebuild build \
+            -project PremiumSlots.xcodeproj \
+            -target PremiumSlots \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Archive unsigned IPA
+        run: |
+          xcodebuild archive \
+            -project PremiumSlots.xcodeproj \
+            -target PremiumSlots \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/PremiumSlots.xcarchive \
+            CODE_SIGNING_ALLOWED=NO
+          APP_PATH=$(find build/PremiumSlots.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -n 1)
+          mkdir -p build/Payload
+          cp -R "$APP_PATH" build/Payload/
+          cd build && zip -r PremiumSlots-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PremiumSlots-unsigned-ipa
+          path: build/PremiumSlots-unsigned.ipa
+          retention-days: 30
