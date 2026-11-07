@@ -1,34 +1,32 @@
 import SwiftUI
 import WebKit
 
-// MARK: - Clerk authentication, v3 (Fix #2)
-// Approach: hosted Clerk in a WKWebView (checklist §3.6 Option B).
-//
-// Why not the Clerk iOS SDK (Option A)? The SDK would need a Swift
-// Package Manager dependency (clerk/clerk-ios) added to the Xcode
-// project, and on this Linux machine there is no Swift toolchain and
-// no way to verify the package resolves, the module imports, or the
-// build still passes. Adding an unverifiable SPM dependency risks
-// breaking the Actions build that currently goes green first try.
-// The WKWebView route uses the site's real Clerk sign-in page, which
-// is the exact flow the web uses, and it works with zero new client
-// dependencies:
+// MARK: - Clerk authentication, v4
+// Full-screen hosted Clerk flow. The Clerk iOS SDK is still not used:
+// it would need an SPM dependency that cannot be verified on this
+// Linux machine, so the hosted WKWebView route stays. The flow is:
 //   1. The web view loads /auth/login (or /auth/register).
-//   2. Clerk JS v5 runs there (the site hides social buttons when the
+//   2. Clerk runs there, and the site hides social buttons when the
 //      user agent carries "PremiumSlotsApp", as the Capacitor shell
-//      does, so the web view signs in with email only).
+//      does, so the web view signs in with email only.
 //   3. Clerk redirects to /auth/clerk_sync, which sets the Flask
 //      session cookie in the web view's cookie store.
 //   4. The app copies that cookie into URLSession's shared cookie
-//      storage, then verifies the session with GET /api/v1/auth/me.
+//      storage, then verifies the session with the session check.
 //   5. If WhatsApp or date of birth is missing, the server flags
 //      needs_onboarding and the app shows the native onboarding form.
-// Sign-out clears both the Clerk session and the Flask cookie
-// (checklist §3.6): the Flask cookie via POST /api/v1/auth/logout,
-// and the web view cookies via ClerkSessionStore.clearAll().
-// Admin stays separate: the Admin tab uses the password-only
-// /api/v1/admin/login session, exactly as on the web. There is no
-// Clerk admin role to route on.
+// Presented as a fullScreenCover from AuthView, never as a sheet, so
+// the sign-in page fills the screen. A native header sits above the
+// web view with the real logo, the flow title, and a close button
+// that dismisses the flow. While the first page loads, the HUD loader
+// shows over the web area with a native progress bar under the
+// header. A failed load shows a native error state with a Retry
+// button instead of a blank page. The site header, navigation, and
+// footer are hidden inside the web view so only the sign-in form
+// shows. Sign-out clears both the Clerk session and the Flask cookie.
+// Admin stays separate: the Admin area uses the password-only admin
+// sign-in session, exactly as on the web. There is no Clerk admin
+// role to route on.
 
 struct ClerkAuthView: View {
     enum Mode {
@@ -41,9 +39,11 @@ struct ClerkAuthView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var isLoadingPage = true
+    @State private var loadProgress = 0.0
+    @State private var hasLoadedOnce = false
     @State private var loadError = ""
-    @State private var showError = false
     @State private var isFinishing = false
+    @State private var reloadID = 0
 
     private var startURL: URL {
         URL(string: mode == .signIn
@@ -51,42 +51,99 @@ struct ClerkAuthView: View {
             : "https://premiumslots.tech/auth/register")!
     }
 
+    private var title: String {
+        mode == .signIn ? "Sign in" : "Create account"
+    }
+
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            header
+
+            if isLoadingPage {
+                ProgressView(value: loadProgress)
+                    .tint(.psCyan)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .accessibilityLabel("Loading sign-in page")
+            }
+
             ZStack {
                 ClerkWebView(
                     url: startURL,
+                    reloadID: reloadID,
                     onSyncComplete: { handleSyncComplete() },
-                    onLoadStateChange: { isLoadingPage = $0 },
+                    onLoadStateChange: { loading in
+                        isLoadingPage = loading
+                        if !loading { hasLoadedOnce = true }
+                    },
+                    onProgress: { loadProgress = $0 },
                     onLoadFailed: { message in
                         loadError = message
-                        showError = true
                     }
                 )
-                if isLoadingPage || isFinishing {
+
+                if isLoadingPage && !hasLoadedOnce {
+                    PSLoaderView()
+                }
+
+                if !loadError.isEmpty {
+                    errorState
+                }
+
+                if isFinishing {
                     Color.psBackground.opacity(0.6).ignoresSafeArea()
                     VStack(spacing: 16) {
                         PSRingSpinner()
-                        Text(isFinishing ? "Finishing sign-in..." : "Loading secure portal...")
+                        Text("Finishing sign-in...")
                             .font(.psBody)
                             .foregroundStyle(.psMuted)
                     }
                 }
             }
-            .background(Color.psBackground)
-            .navigationTitle(mode == .signIn ? "Sign in" : "Create account")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { dismiss() }
-                }
-            }
-            .alert("Could not load sign-in", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(loadError)
-            }
         }
+        .background(Color.psBackground)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            RealLogoView(size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.psHeadline)
+                Text("Secure sign-in on the PremiumSlots website")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
+            }
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.psMuted)
+                    .frame(width: 44, height: 44)
+                    .background(Color.psSurface)
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel("Close sign-in")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var errorState: some View {
+        PSErrorState(message: loadError) {
+            retry()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.psBackground)
+    }
+
+    private func retry() {
+        loadError = ""
+        isLoadingPage = true
+        loadProgress = 0
+        reloadID += 1
     }
 
     private func handleSyncComplete() {
@@ -105,7 +162,6 @@ struct ClerkAuthView: View {
                 await MainActor.run {
                     isFinishing = false
                     loadError = "Sign-in did not complete. Please try again."
-                    showError = true
                 }
             }
         }
@@ -156,18 +212,30 @@ enum ClerkSessionStore {
 
 private struct ClerkWebView: UIViewRepresentable {
     let url: URL
+    let reloadID: Int
     var onSyncComplete: () -> Void
     var onLoadStateChange: (Bool) -> Void
+    var onProgress: (Double) -> Void
     var onLoadFailed: (String) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onSyncComplete: onSyncComplete,
                     onLoadStateChange: onLoadStateChange,
+                    onProgress: onProgress,
                     onLoadFailed: onLoadFailed)
     }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        // Hide the site header, navigation, and footer inside the
+        // sign-in page so only the sign-in form shows. Clerk itself
+        // renders inside plain containers, so this leaves the form
+        // untouched.
+        let hideChrome = WKUserScript(
+            source: "var s=document.createElement('style');s.textContent='header,nav,footer{display:none !important}';document.documentElement.appendChild(s);",
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true)
+        config.userContentController.addUserScript(hideChrome)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         // The site hides Clerk social buttons when the request comes
@@ -175,24 +243,43 @@ private struct ClerkWebView: UIViewRepresentable {
         if let agent = webView.value(forKey: "userAgent") as? String {
             webView.customUserAgent = agent + " PremiumSlotsApp"
         }
+        context.coordinator.attachProgress(to: webView)
         webView.load(URLRequest(url: url))
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        if context.coordinator.lastReloadID != reloadID {
+            context.coordinator.lastReloadID = reloadID
+            uiView.reload()
+        }
+    }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var onSyncComplete: () -> Void
         var onLoadStateChange: (Bool) -> Void
+        var onProgress: (Double) -> Void
         var onLoadFailed: (String) -> Void
+        var lastReloadID = 0
         private var didComplete = false
+        private var progressObservation: NSKeyValueObservation?
 
         init(onSyncComplete: @escaping () -> Void,
              onLoadStateChange: @escaping (Bool) -> Void,
+             onProgress: @escaping (Double) -> Void,
              onLoadFailed: @escaping (String) -> Void) {
             self.onSyncComplete = onSyncComplete
             self.onLoadStateChange = onLoadStateChange
+            self.onProgress = onProgress
             self.onLoadFailed = onLoadFailed
+        }
+
+        func attachProgress(to webView: WKWebView) {
+            progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, change in
+                if let value = change.newValue {
+                    self?.onProgress(value)
+                }
+            }
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

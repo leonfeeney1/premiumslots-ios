@@ -62,7 +62,8 @@ struct APIService: Decodable, Identifiable {
             duration: monthly_cost > 0 ? "1 month" : "1 month",
             systemImage: Platform.systemImage(for: icon_name, name: name),
             accent: "blue",
-            liveId: id
+            liveId: id,
+            iconDomain: icon_name
         )
     }
 }
@@ -133,6 +134,30 @@ struct APISubscription: Decodable, Identifiable {
     let account_group: String?
     let locked_price: Int?
     let created_at: String?
+    /// Customer identity, v4 admin: the admin subscriptions endpoint
+    /// JOINs Users, so these carry the current Users values
+    /// (customer_name from Users.name, customer_whatsapp from
+    /// Users.whatsapp_number, customer_email from Users.email).
+    /// Absent on older backends; the name falls back to "Customer".
+    let customer_name: String?
+    let customer_whatsapp: String?
+    let customer_email: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, service_requested, amount_due, mpesa_code, delivery_type
+        case status, expiry_date, viewed, issue_reported, account_group
+        case locked_price, created_at, customer_name
+        case customer_whatsapp = "whatsapp_number"
+        case customer_email = "email"
+    }
+
+    /// Display name for admin rows. Never a made-up name: the real
+    /// name from the API when present, otherwise "Customer".
+    var customerDisplayName: String {
+        let name = (customer_name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Customer" : name
+    }
 
     var orderStatus: OrderStatus {
         switch status {
@@ -482,6 +507,33 @@ final class APIClient: ObservableObject {
         return response.subscriptions
     }
 
+    // MARK: - admin notifications (v4)
+    // GET /api/v1/admin/notifications (feed, newest first) and
+    // GET /api/v1/admin/notifications/unread-count (badge count) are
+    // plain GETs. POST /api/v1/admin/notifications/mark-read marks
+    // unviewed subscriptions viewed; tickets clear when resolved and
+    // deposits when approved or rejected.
+
+    func adminNotifications(limit: Int? = nil) async throws -> AdminNotificationsResponse {
+        var path = "api/v1/admin/notifications"
+        if let limit { path += "?limit=\(limit)" }
+        return try await request(path)
+    }
+
+    func adminNotificationsUnreadCount() async throws -> Int {
+        struct Wrapper: Decodable {
+            let ok: Bool
+            let unread_count: Int?
+            let counts: [String: Int]?
+        }
+        let wrapper: Wrapper = try await request("api/v1/admin/notifications/unread-count")
+        return wrapper.unread_count ?? 0
+    }
+
+    func adminMarkAllNotificationsRead() async throws -> APIResponse {
+        try await postOK("api/v1/admin/notifications/mark-read", body: [:])
+    }
+
     func adminApprove(subscriptionId: Int, vaultEmail: String,
                       vaultPassword: String, accountGroup: String) async throws {
         let _: APIResponse = try await postOK(
@@ -507,8 +559,7 @@ final class APIClient: ObservableObject {
         return wrapper.is_banned ?? false
     }
 
-    func adminUpdateService(id: Int, fields: [String: Any]) async throws {
-        let _: APIResponse = try await request("api/v1/admin/services/\(id)",
+    func adminUpdateService(id: Int, fields: [String: Any]) async throws {        let _: APIResponse = try await request("api/v1/admin/services/\(id)",
                                               method: "PUT", body: fields)
     }
 

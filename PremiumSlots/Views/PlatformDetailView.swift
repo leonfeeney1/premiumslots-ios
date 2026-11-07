@@ -11,14 +11,7 @@ struct PlatformDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.psAccent(named: platform.accent).opacity(0.16))
-                                .frame(width: 64, height: 64)
-                            Image(systemName: platform.systemImage)
-                                .font(.system(size: 24))
-                                .foregroundStyle(Color.psAccent(named: platform.accent))
-                        }
+                        PlatformLogoView(platform: platform, size: 64)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(platform.name)
                                 .font(.psTitle)
@@ -79,18 +72,21 @@ struct PlatformDetailView: View {
                     }
 
                     if appState.liveState != .live {
-                        Text("Stock last verified \(Platform.stockVerifiedDate).")
+                        Text("Showing the latest catalogue we could load.")
                             .font(.psCaption)
                             .foregroundStyle(.psMuted)
                     }
                 }
                 .padding(16)
+                .hideKeyboardOnTap()
             }
+            .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle(platform.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                dismissKeyboardButton
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
                 }

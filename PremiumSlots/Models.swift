@@ -12,6 +12,9 @@ struct Platform: Identifiable, Codable, Equatable {
     let systemImage: String
     let accent: String
     var liveId: Int?
+    /// Live site icon_name domain (e.g. "primevideo.com"), used for
+    /// the real platform logo. Nil for bundled platforms.
+    var iconDomain: String? = nil
 
     var isSoldOut: Bool { slotsLeft == 0 }
     var formattedPrice: String { "KES \(priceKES)" }
@@ -42,10 +45,8 @@ struct Platform: Identifiable, Codable, Equatable {
 }
 
 extension Platform {
-    /// Bundled catalogue, used ONLY as an offline fallback. Per-platform
-    /// prices and stock were last fully verified on 3 Nov 2026. The app
-    /// labels this date whenever it shows bundled data, and never
-    /// presents bundled data as live.
+    /// Bundled catalogue, used ONLY as an offline fallback. The app
+    /// never presents bundled data as live.
     static let bundled: [Platform] = [
         Platform(id: "spotify", name: "Spotify Premium Family", tagline: "Music for the whole household", priceKES: 180, slotsLeft: 0, duration: "1 month", systemImage: "music.note", accent: "green"),
         Platform(id: "prime-video", name: "Prime Video", tagline: "Films and series, on demand", priceKES: 120, slotsLeft: 10, duration: "1 month", systemImage: "play.tv.fill", accent: "blue"),
@@ -59,8 +60,6 @@ extension Platform {
 
     static let liveTotalSlotsOnHomepage = 67
     static let communitySuggestions = 7
-    static let stockVerifiedDate = "3 Nov 2026"
-    static let homepageCheckedDate = "7 Nov 2026"
 }
 
 // MARK: - Live subscription (from the API)
@@ -77,6 +76,8 @@ struct LiveSubscription: Identifiable, Equatable {
     /// Grandfathered price for this subscription, when the live site
     /// carries one (locked_price column, when present on production).
     let lockedPrice: Int?
+    /// When this subscription started (API created_at).
+    let createdAt: String?
 
     var orderStatus: OrderStatus {
         switch status {
@@ -103,6 +104,7 @@ struct LiveSubscription: Identifiable, Equatable {
         issueReported = api.issue_reported ?? false
         accountGroup = api.account_group
         lockedPrice = api.locked_price
+        createdAt = api.created_at
     }
 }
 
@@ -182,6 +184,12 @@ final class AppState: ObservableObject {
     @Published var adminPending: [APISubscription] = []
     @Published var adminSubscriptions: [APISubscription] = []
     @Published var adminCustomers: [APICustomer] = []
+    /// Unread admin-event count for the Admin badge. Mirrored here
+    /// from AdminNotifier (v4) so the badge refreshes when the
+    /// notifier polls; the notifier itself lives in
+    /// AdminNotificationsView.swift.
+    @Published var adminUnreadCount = 0
+    let adminNotifier = AdminNotifier()
 
     private let ordersKey = "premiumslots.orders.v1"
     private let waitlistKey = "premiumslots.waitlist.v1"
@@ -190,6 +198,12 @@ final class AppState: ObservableObject {
     init() {
         loadLocalState()
         isAdminLoggedIn = UserDefaults.standard.bool(forKey: adminKey)
+        adminNotifier.onUnreadCount = { [weak self] count in
+            self?.adminUnreadCount = count
+        }
+        if isAdminLoggedIn {
+            adminNotifier.start()
+        }
     }
 
     var platformCount: Int { platforms.count }
@@ -227,10 +241,10 @@ final class AppState: ObservableObject {
             platforms = response.services.map { $0.platform }
             liveTotalSlots = response.slots_in_rotation
             liveState = .live
-            refreshMessage = "Live catalogue from premiumslots.tech just now."
+            refreshMessage = nil
         } catch {
             liveState = .offline
-            refreshMessage = "Live service unreachable. Showing saved catalogue from \(Platform.stockVerifiedDate)."
+            refreshMessage = "Saved catalogue"
             await refreshLiveTotal()
         }
     }
@@ -250,7 +264,7 @@ final class AppState: ObservableObject {
                 liveTotalSlots = total
             }
         } catch {
-            // Offline: bundled total stays.
+            // Unreachable: bundled total stays.
         }
     }
 
@@ -378,6 +392,7 @@ final class AppState: ObservableObject {
         isAdminLoggedIn = true
         UserDefaults.standard.set(true, forKey: adminKey)
         await refreshAdmin()
+        adminNotifier.start()
     }
 
     func adminLogout() async {
@@ -388,6 +403,8 @@ final class AppState: ObservableObject {
         adminPending = []
         adminSubscriptions = []
         adminCustomers = []
+        adminNotifier.stop()
+        adminUnreadCount = 0
     }
 
     func refreshAdmin() async {

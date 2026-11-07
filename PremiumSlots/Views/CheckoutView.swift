@@ -304,7 +304,7 @@ struct CheckoutView: View {
                             Label("Order #\(id) saved as \(placedStatus ?? "Pending verification")", systemImage: "clock.fill")
                                 .font(.psHeadline)
                                 .foregroundStyle(.psAmber)
-                            Text("Your order was recorded on premiumslots.tech. It will move to Active once the team approves it.")
+                            Text("Your order was recorded. It will move to Active once the team approves it.")
                                 .font(.psCaption)
                                 .foregroundStyle(.psMuted)
                             if placedStatus == "Initiated" || placedStatus == "Pending" {
@@ -354,6 +354,8 @@ struct CheckoutView: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .hideKeyboardOnTap()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle("Checkout")
@@ -362,6 +364,7 @@ struct CheckoutView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
                 }
+                dismissKeyboardButton
             }
             .alert("Check the details", isPresented: $showError) {
                 Button("OK", role: .cancel) { }

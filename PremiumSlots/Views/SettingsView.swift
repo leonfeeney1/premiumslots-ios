@@ -1,16 +1,24 @@
 import SwiftUI
 
-// MARK: - Settings, v3 Fix #3
+// MARK: - Settings, v4
 // HIG pass: grouped Form, consistent section headers, 44pt touch
 // targets, accessibility labels, safe-area padding. Content is the
 // same as v3; Fix #4 adds the account, wallet, help and security
-// screens linked from here.
+// screens linked from here. The Support section uses the WhatsApp
+// number from the live homepage, and the Admin row opens the admin
+// area when an admin session exists, otherwise the admin sign-in.
+// There is no email support row: no support email address appears in
+// the workspace docs, so none is shown rather than guessing one.
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("premiumslots.appearance") private var appearance = "system"
     @AppStorage("premiumslots.notifications") private var notificationsEnabled = false
     @State private var showAuth = false
+
+    private var supportWhatsAppURL: URL {
+        URL(string: "https://wa.me/254747412440?text=Hi%20PremiumSlots%2C%20I%20need%20help%20with%20my%20subscription.")!
+    }
 
     var body: some View {
         NavigationStack {
@@ -187,7 +195,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Catalogue state")
                         Spacer()
-                        Text(appState.liveState == .live ? "Live" : "Saved copy")
+                        Text(appState.liveState == .live ? "Live" : "Saved catalogue")
                             .foregroundStyle(.psMuted)
                     }
                     Button("Refresh live catalogue") {
@@ -198,11 +206,59 @@ struct SettingsView: View {
                             .font(.psCaption)
                             .foregroundStyle(.psMuted)
                     }
-                    Text("Stock last verified \(Platform.stockVerifiedDate). Homepage checked \(Platform.homepageCheckedDate).")
+                } header: {
+                    Text("Catalogue")
+                }
+
+                Section {
+                    Link(destination: supportWhatsAppURL) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("WhatsApp support")
+                                    .font(.psBody)
+                                Text("+254 747 412 440")
+                                    .font(.psCaption)
+                                    .foregroundStyle(.psMuted)
+                            }
+                        } icon: {
+                            Image(systemName: "message.fill")
+                        }
+                    }
+                    .accessibilityLabel("WhatsApp support, plus 254 747 412 440")
+                    NavigationLink {
+                        HelpRootView()
+                    } label: {
+                        Label("Help and FAQ", systemImage: "questionmark.circle.fill")
+                            .font(.psBody)
+                    }
+                    NavigationLink {
+                        TicketsRootView()
+                    } label: {
+                        Label("My tickets", systemImage: "ticket.fill")
+                            .font(.psBody)
+                    }
+                    Text("For a slot problem, include the platform name and your M-PESA code.")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
                 } header: {
-                    Text("Catalogue")
+                    Text("Support")
+                }
+
+                Section {
+                    NavigationLink {
+                        AdminView()
+                    } label: {
+                        Label(
+                            appState.isAdminLoggedIn ? "Admin dashboard" : "Admin sign-in",
+                            systemImage: "person.badge.key.fill"
+                        )
+                        .font(.psBody)
+                    }
+                    Text("Admin uses a separate sign-in from a customer account.")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                } header: {
+                    Text("Admin")
                 }
 
                 Section {
@@ -211,28 +267,20 @@ struct SettingsView: View {
                         VStack(alignment: .leading) {
                             Text("PremiumSlots")
                                 .font(.psHeadline)
-                            Text("Version 3.0 (Clerk sign-in, light and dark themes)")
+                            Text("Shared subscriptions")
                                 .font(.psCaption)
                                 .foregroundStyle(.psMuted)
                         }
                     }
                     Link("Visit premiumslots.tech", destination: URL(string: "https://premiumslots.tech")!)
-                    Text("Shared subscriptions. Live data comes from the /api/v1 endpoints once the backend blueprint is deployed; until then the app shows the saved catalogue and says so.")
+                    Text("Live data comes from the live service when it is reachable. Otherwise the app shows the saved catalogue and labels it as saved.")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
                 } header: {
                     Text("About")
                 }
-
-                Section {
-                    Link("Support on premiumslots.tech", destination: URL(string: "https://premiumslots.tech")!)
-                    Text("For a slot problem, include the platform name and your M-PESA code.")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                } header: {
-                    Text("Support")
-                }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)

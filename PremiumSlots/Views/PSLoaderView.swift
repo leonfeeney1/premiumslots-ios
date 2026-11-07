@@ -12,9 +12,8 @@ import SwiftUI
 //   - 320x4px gradient progress bar, scaleX 0 to 1 from the left then
 //     1 to 0 from the right over 2s
 //   - "ESTABLISHING CONNECTION" in letterspaced type, #7FCDFF
-//   - JetBrains Mono corner data (decorative HUD strings from the web
-//     page; shown only on this loading screen, never as the app's own
-//     version/build numbers)
+// No corner data, version labels, or status strings are shown here:
+// the loader is only rings, logo, progress bar, and label.
 // The parent shows this view while loading and fades it out over 0.6s
 // (matching the web: fade after load + 1500ms, removed after 600ms).
 // Use PSLoaderView for full-screen loads and PSRingSpinner for buttons
@@ -117,22 +116,6 @@ struct PSLoaderView: View {
                     .foregroundStyle(Color(red: 0.50, green: 0.80, blue: 1.00))
                     .shadow(color: Color(red: 0.18, green: 0.61, blue: 0.90).opacity(0.5), radius: 8)
             }
-
-            // Corner HUD data, JetBrains Mono equivalent (SF Mono).
-            VStack {
-                HStack {
-                    hudCorner("SYS.INIT...\nMEM: OK\nNET: SECURE")
-                    Spacer()
-                    hudCorner("AUTH: PENDING\nKEY: 0x9A2F\nENC: AES-256")
-                }
-                Spacer()
-                HStack {
-                    hudCorner("LOC: NAIROBI\nLAT: -1.2921\nLNG: 36.8219")
-                    Spacer()
-                    hudCorner("VER: 2.4.1\nBULD: 9812\nSTS: ONLINE")
-                }
-            }
-            .padding(30)
         }
         .task {
             withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
@@ -169,13 +152,6 @@ struct PSLoaderView: View {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
-    }
-
-    private func hudCorner(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .regular, design: .monospaced))
-            .foregroundStyle(Color(red: 0.33, green: 0.73, blue: 0.97).opacity(0.5))
-            .multilineTextAlignment(.leading)
     }
 }
 

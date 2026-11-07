@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct PremiumSlotsApp: App {
@@ -25,6 +26,12 @@ struct PremiumSlotsApp: App {
             }
             .animation(.easeOut(duration: 0.6), value: appState.isCheckingSession)
             .task {
+                // Admin local notifications (new pending subscriptions)
+                // need authorization; asking once at launch is the
+                // standard prompt. True push needs APNs and is not in
+                // this build.
+                try? await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .badge, .sound])
                 await appState.checkSession()
                 await appState.refreshCatalogue()
             }

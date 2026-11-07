@@ -108,6 +108,7 @@ struct MySlotsView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.interactively)
             .background(Color.psBackground)
             .navigationTitle("My Slots")
             .navigationBarTitleDisplayMode(.inline)
@@ -156,7 +157,8 @@ struct MySlotsView: View {
     private func liveSlotCard(_ sub: LiveSubscription) -> some View {
         PSCard {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
+                HStack(spacing: 12) {
+                    PlatformLogoView(name: sub.serviceRequested, size: 48)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(sub.serviceRequested)
                             .font(.psHeadline)
@@ -171,10 +173,25 @@ struct MySlotsView: View {
                         tint: sub.orderStatus == .active ? .psSuccess : .psAmber
                     )
                 }
-                if let days = sub.daysLeft, sub.status == "Approved" {
-                    Text(days >= 0 ? "\(days) days left" : "Expired")
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
+                        .accessibilityHidden(true)
+                    if let expiry = formattedDate(sub.expiryDate) {
+                        Text("Expires \(expiry)")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    } else {
+                        Text("No expiry date shown")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    if let days = sub.daysLeft, sub.status == "Approved" {
+                        Text("· \(days >= 0 ? "\(days) days left" : "Expired")")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
                 if sub.status == "Approved" {
                     HStack(spacing: 10) {
@@ -214,22 +231,57 @@ struct MySlotsView: View {
 
     private func orderRow(_ order: SlotOrder) -> some View {
         PSCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(order.platformName)
-                        .font(.psHeadline)
-                    Text("KES \(order.amountKES) · \(order.mpesaCode)")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    PlatformLogoView(name: order.platformName, size: 48)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(order.platformName)
+                            .font(.psHeadline)
+                        Text("KES \(order.amountKES) · \(order.mpesaCode)")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    Spacer()
+                    PSStatusPill(
+                        text: order.status.rawValue,
+                        systemImage: order.status.systemImage,
+                        tint: order.status == .active ? .psSuccess : .psAmber
+                    )
+                }
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
+                        .accessibilityHidden(true)
+                    Text("Started \(shortDate(order.createdAt))")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                    if let activatedAt = order.activatedAt {
+                        Text("· Active since \(shortDate(activatedAt))")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
-                Spacer()
-                PSStatusPill(
-                    text: order.status.rawValue,
-                    systemImage: order.status.systemImage,
-                    tint: order.status == .active ? .psSuccess : .psAmber
-                )
             }
         }
+    }
+
+    /// Formats an ISO 8601 date string from the API as a short date
+    /// for display. Returns nil when there is no date to show.
+    private func formattedDate(_ iso: String?) -> String? {
+        guard let iso, !iso.isEmpty else { return nil }
+        let parser = ISO8601DateFormatter()
+        if let date = parser.date(from: iso) {
+            return shortDate(date)
+        }
+        return iso
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
     }
 
     private func revealVault(for sub: LiveSubscription) async {

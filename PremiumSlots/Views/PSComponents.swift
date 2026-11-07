@@ -148,15 +148,17 @@ struct PSErrorState: View {
     }
 }
 
-/// Offline banner: labelled saved data, shown at the top of lists
-/// whenever the live API is unreachable.
+/// Saved catalogue pill: the only offline label in the app. It marks
+/// bundled data as saved, never as live, and carries no status text,
+/// version, or endpoint. The message argument is kept so existing call
+/// sites compile, but it is never shown.
 struct PSOfflineBanner: View {
     let message: String
 
     var body: some View {
-        Label(message, systemImage: "wifi.slash")
+        Label("Saved catalogue", systemImage: "wifi.slash")
             .font(.psCaption)
-            .foregroundStyle(.psAmber)
+            .foregroundStyle(.psMuted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(Color.psSurface)

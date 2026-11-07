@@ -1,12 +1,11 @@
 import SwiftUI
 
-// MARK: - Sign-in, v3 (Fix #2)
-// Clerk-first, replacing the v2 placeholder own-auth login. The v2
-// login cannot sign in Clerk users at all: Clerk-created accounts
-// have an empty password hash, so the old email/password login
-// always failed for them. The web signs customers in with Clerk
-// (Clerk JS v5) and syncs into the Flask session; the app does the
-// same through ClerkAuthView (WKWebView hosted Clerk).
+// MARK: - Sign-in, v4
+// Clerk-first entry screen. The v2 placeholder own-auth login is gone
+// and stays gone: Clerk-created accounts have an empty password hash,
+// so an email and password login could never sign them in. Customers
+// sign in with Clerk through ClerkAuthView (hosted WKWebView), launched
+// here as a fullScreenCover so the sign-in page fills the screen.
 // The own-auth recovery paths are kept as secondary options only:
 // forgot/reset password and magic-link sign-in, which still work
 // for accounts created with a password on the web.
@@ -23,28 +22,37 @@ struct AuthView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        RealLogoView(size: 56)
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        LogoLockupView(height: 40)
                         Text("Welcome back")
                             .font(.psTitle)
-                        Text("Sign in with Clerk, the same secure sign-in you use on premiumslots.tech. Your password is never visible to PremiumSlots.")
+                        Text("Sign in with Clerk, the same secure sign-in you use on the PremiumSlots website. Your password is never visible to PremiumSlots.")
                             .font(.psBody)
                             .foregroundStyle(.psMuted)
                     }
+                    .padding(.top, 24)
 
-                    Button {
-                        showClerkSignIn = true
-                    } label: {
-                        Label("Continue with Clerk", systemImage: "person.badge.key.fill")
-                    }
-                    .psPrimary()
+                    VStack(spacing: 12) {
+                        Button {
+                            showClerkSignIn = true
+                        } label: {
+                            Label("Continue", systemImage: "person.badge.key.fill")
+                        }
+                        .psPrimary()
 
-                    Button("Create an account") {
-                        showClerkSignUp = true
+                        Button {
+                            showClerkSignUp = true
+                        } label: {
+                            Text("Create account")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.psCyan)
+                        .controlSize(.large)
                     }
-                    .font(.psBody)
-                    .frame(maxWidth: .infinity)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Having trouble signing in?")
@@ -64,28 +72,35 @@ struct AuthView: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle("Sign in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.psMuted)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Close sign-in")
                 }
             }
-            .sheet(isPresented: $showClerkSignIn) {
+            .fullScreenCover(isPresented: $showClerkSignIn) {
                 ClerkAuthView(mode: .signIn) { needsOnboarding in
                     Task { await appState.clerkSignedIn(needsOnboarding: needsOnboarding) }
                     dismiss()
                 }
-                .psSheetDetents()
             }
-            .sheet(isPresented: $showClerkSignUp) {
+            .fullScreenCover(isPresented: $showClerkSignUp) {
                 ClerkAuthView(mode: .signUp) { needsOnboarding in
                     Task { await appState.clerkSignedIn(needsOnboarding: needsOnboarding) }
                     dismiss()
                 }
-                .psSheetDetents()
             }
             .sheet(isPresented: $showForgot) { ForgotPasswordView().psSheetDetents() }
             .sheet(isPresented: $showMagic) { MagicLinkView().psSheetDetents() }
@@ -97,48 +112,48 @@ struct AuthView: View {
 
 private struct ForgotPasswordView: View {
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var emailFocused: Bool
     @State private var email = ""
     @State private var message = ""
     @State private var isSubmitting = false
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Reset your password")
-                    .font(.psTitle)
-                Text("A reset link is valid for 15 minutes. If that email has an account, the link is on its way.")
-                    .font(.psBody)
-                    .foregroundStyle(.psMuted)
-                TextField("Email", text: $email)
-                    .textContentType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    .autocorrectionDisabled()
-                    .font(.psBody)
-                    .padding(12)
-                    .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.psBorder, lineWidth: 1))
-                Button {
-                    Task { await submit() }
-                } label: {
-                    if isSubmitting {
-                        PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
-                    } else {
-                        Text("Send reset link")
-                    }
-                }
-                .psPrimary()
-                .disabled(isSubmitting)
-                if !message.isEmpty {
-                    Text(message)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Reset your password")
+                        .font(.psTitle)
+                    Text("A reset link is valid for 15 minutes. If that email has an account, the link is on its way.")
                         .font(.psBody)
                         .foregroundStyle(.psMuted)
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .focused($emailFocused)
+                        .psTextField()
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
+                        } else {
+                            Text("Send reset link")
+                        }
+                    }
+                    .psPrimary()
+                    .disabled(isSubmitting)
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
-                Spacer()
+                .padding(16)
             }
-            .padding(16)
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture { emailFocused = false }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle("Forgot password")
@@ -146,6 +161,9 @@ private struct ForgotPasswordView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") { emailFocused = false }
                 }
             }
         }
@@ -171,48 +189,48 @@ private struct ForgotPasswordView: View {
 
 private struct MagicLinkView: View {
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var emailFocused: Bool
     @State private var email = ""
     @State private var message = ""
     @State private var isSubmitting = false
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Sign in with a link")
-                    .font(.psTitle)
-                Text("We email you a one-time sign-in link. It works once, then it stops working.")
-                    .font(.psBody)
-                    .foregroundStyle(.psMuted)
-                TextField("Email", text: $email)
-                    .textContentType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    .autocorrectionDisabled()
-                    .font(.psBody)
-                    .padding(12)
-                    .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.psBorder, lineWidth: 1))
-                Button {
-                    Task { await submit() }
-                } label: {
-                    if isSubmitting {
-                        PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
-                    } else {
-                        Text("Email me a sign-in link")
-                    }
-                }
-                .psPrimary()
-                .disabled(isSubmitting)
-                if !message.isEmpty {
-                    Text(message)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Sign in with a link")
+                        .font(.psTitle)
+                    Text("We email you a one-time sign-in link. It works once, then it stops working.")
                         .font(.psBody)
                         .foregroundStyle(.psMuted)
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .focused($emailFocused)
+                        .psTextField()
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
+                        } else {
+                            Text("Email me a sign-in link")
+                        }
+                    }
+                    .psPrimary()
+                    .disabled(isSubmitting)
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
                 }
-                Spacer()
+                .padding(16)
             }
-            .padding(16)
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture { emailFocused = false }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
             .navigationTitle("Magic link")
@@ -220,6 +238,9 @@ private struct MagicLinkView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") { emailFocused = false }
                 }
             }
         }
@@ -241,83 +262,162 @@ private struct MagicLinkView: View {
     }
 }
 
-// MARK: - Onboarding (WhatsApp + date of birth after Clerk sign-in)
+// MARK: - Onboarding, v4 (native full-screen form)
+// Rebuilt as a native form, not a web page: WhatsApp number plus a
+// date of birth picker, with inline validation, tap-to-dismiss and a
+// Done toolbar button. Shown after Clerk sign-in when the server
+// flags needs_onboarding. ContentView presents it full-screen; the
+// form itself fills the screen either way.
 
 struct OnboardingView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    private enum Field {
+        case whatsapp
+    }
+
+    @FocusState private var focusedField: Field?
     @State private var whatsappNumber = ""
-    @State private var dateOfBirth = ""
+    @State private var dateOfBirth = Calendar.current.date(byAdding: .year, value: -20, to: Date()) ?? Date()
+    @State private var whatsappError = ""
+    @State private var dateOfBirthError = ""
     @State private var errorMessage = ""
     @State private var showError = false
     @State private var isSubmitting = false
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                RealLogoView(size: 56)
-                Text("Finish setting up")
-                    .font(.psTitle)
-                Text("PremiumSlots needs your WhatsApp number and date of birth to finish your account, the same as on the website.")
-                    .font(.psBody)
-                    .foregroundStyle(.psMuted)
-                TextField("WhatsApp number", text: $whatsappNumber)
-                    .textContentType(.telephoneNumber)
-                    .keyboardType(.phonePad)
-                    .autocorrectionDisabled()
-                    .font(.psBody)
-                    .padding(12)
-                    .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.psBorder, lineWidth: 1))
-                TextField("Date of birth (YYYY-MM-DD)", text: $dateOfBirth)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.psBody)
-                    .padding(12)
-                    .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.psBorder, lineWidth: 1))
-                Button {
-                    Task { await submit() }
-                } label: {
-                    if isSubmitting {
-                        PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
-                    } else {
-                        Text("Save and continue")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    LogoLockupView(height: 40)
+                    Text("Finish setting up")
+                        .font(.psTitle)
+                    Text("PremiumSlots needs your WhatsApp number and date of birth to finish your account, the same as on the website.")
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("WhatsApp number")
+                            .font(.psHeadline)
+                        TextField("Enter your WhatsApp number", text: $whatsappNumber)
+                            .textContentType(.telephoneNumber)
+                            .keyboardType(.phonePad)
+                            .autocorrectionDisabled()
+                            .focused($focusedField, equals: .whatsapp)
+                            .psTextField()
+                            .onChange(of: whatsappNumber) { _, _ in whatsappError = "" }
+                        if !whatsappError.isEmpty {
+                            Text(whatsappError)
+                                .font(.psCaption)
+                                .foregroundStyle(.psDanger)
+                        }
                     }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Date of birth")
+                            .font(.psHeadline)
+                        DatePicker(
+                            "Date of birth",
+                            selection: $dateOfBirth,
+                            in: ...Calendar.current.date(byAdding: .year, value: -13, to: Date())!,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.compact)
+                        .font(.psBody)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.psSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.psBorder, lineWidth: 1))
+                        .onChange(of: dateOfBirth) { _, _ in dateOfBirthError = "" }
+                        if !dateOfBirthError.isEmpty {
+                            Text(dateOfBirthError)
+                                .font(.psCaption)
+                                .foregroundStyle(.psDanger)
+                        }
+                    }
+
+                    Button {
+                        Task { await submit() }
+                    } label: {
+                        if isSubmitting {
+                            PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7)
+                        } else {
+                            Text("Save and continue")
+                        }
+                    }
+                    .psPrimary()
+                    .disabled(isSubmitting)
+                    .padding(.top, 4)
                 }
-                .psPrimary()
-                .disabled(isSubmitting)
-                Spacer()
+                .padding(16)
             }
-            .padding(16)
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture { focusedField = nil }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psBackground)
-            .navigationTitle("Onboarding")
+            .navigationTitle("Finish setting up")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .keyboard) {
+                    Button("Done") { focusedField = nil }
+                }
+            }
             .alert("Could not save", isPresented: $showError) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
             }
+            .task {
+                if let user = appState.user {
+                    if !user.whatsapp_number.isEmpty {
+                        whatsappNumber = user.whatsapp_number
+                    }
+                    if let saved = user.date_of_birth,
+                       let parsed = OnboardingView.dateFormatter.date(from: saved) {
+                        dateOfBirth = parsed
+                    }
+                }
+            }
         }
     }
 
-    private func submit() async {
-        guard !whatsappNumber.trimmingCharacters(in: .whitespaces).isEmpty else {
-            errorMessage = "Enter your WhatsApp number."
-            showError = true
-            return
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_GB")
+        return formatter
+    }()
+
+    private func validate() -> Bool {
+        let digits = whatsappNumber.filter { $0.isNumber }
+        if digits.count < 9 || digits.count > 15 {
+            whatsappError = "Enter a valid WhatsApp number, 9 to 15 digits."
+            return false
         }
+        let age = Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0
+        if age < 13 {
+            dateOfBirthError = "You must be at least 13 years old."
+            return false
+        }
+        if age > 120 {
+            dateOfBirthError = "Check the date of birth and try again."
+            return false
+        }
+        return true
+    }
+
+    private func submit() async {
+        focusedField = nil
+        guard validate() else { return }
         isSubmitting = true
         defer { isSubmitting = false }
         do {
             let response = try await APIClient.shared.completeOnboarding(
-                whatsappNumber: whatsappNumber, dateOfBirth: dateOfBirth)
+                whatsappNumber: whatsappNumber,
+                dateOfBirth: OnboardingView.dateFormatter.string(from: dateOfBirth))
             guard response.ok else {
                 throw APIError.message(response.error ?? "Could not save.")
             }

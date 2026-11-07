@@ -11,7 +11,11 @@ import SwiftUI
 // {"ok": true, "subscriptions": [_subscription_row]} where a row is
 // {"id", "service_requested", "amount_due", "mpesa_code",
 //  "delivery_type", "status", "expiry_date", "viewed",
-//  "issue_reported", "account_group", "created_at", "locked_price"}
+//  "issue_reported", "account_group", "created_at", "locked_price",
+//  "customer_name", "whatsapp_number", "email"}.
+// The customer fields come from a Users JOIN in v4 (Users.name,
+// Users.whatsapp_number, Users.email); on an older backend they are
+// absent and the name falls back to "Customer", never a made-up name.
 
 struct AdminSubscriptionRow: Decodable, Identifiable, Equatable {
     let id: Int
@@ -26,6 +30,25 @@ struct AdminSubscriptionRow: Decodable, Identifiable, Equatable {
     let account_group: String?
     let created_at: String?
     let locked_price: Int?
+    let customer_name: String?
+    let customer_whatsapp: String?
+    let customer_email: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, service_requested, amount_due, mpesa_code, delivery_type
+        case status, expiry_date, viewed, issue_reported, account_group
+        case created_at, locked_price, customer_name
+        case customer_whatsapp = "whatsapp_number"
+        case customer_email = "email"
+    }
+
+    /// Display name for admin rows. Never a made-up name: the real
+    /// name from the API when present, otherwise "Customer".
+    var customerDisplayName: String {
+        let name = (customer_name ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Customer" : name
+    }
 }
 
 struct AdminSubscriptionsListResponse: Decodable {
@@ -71,7 +94,10 @@ struct AdminSubscriptionsRootView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !query.isEmpty {
             list = list.filter {
-                $0.service_requested.localizedCaseInsensitiveContains(query)
+                ($0.customer_name ?? "").localizedCaseInsensitiveContains(query)
+                || ($0.customer_whatsapp ?? "").localizedCaseInsensitiveContains(query)
+                || ($0.customer_email ?? "").localizedCaseInsensitiveContains(query)
+                || $0.service_requested.localizedCaseInsensitiveContains(query)
                 || ($0.mpesa_code ?? "").localizedCaseInsensitiveContains(query)
                 || String($0.id).contains(query)
             }
@@ -115,7 +141,7 @@ struct AdminSubscriptionsRootView: View {
         }
         .task { await load() }
         .refreshable { await load() }
-        .searchable(text: $searchText, prompt: "Search service, code or order")
+        .searchable(text: $searchText, prompt: "Search customer, service, code or order")
         .sheet(item: $selected) { sub in
             AdminSubscriptionDetailSheet(subscription: sub) {
                 selected = nil
@@ -191,8 +217,10 @@ struct AdminSubscriptionsRootView: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text(sub.service_requested)
+                Text(sub.customerDisplayName)
                     .font(.psHeadline)
+                Text(sub.service_requested)
+                    .font(.psBody)
                 Text("Order #\(sub.id) · KES \(sub.amount_due) · code \(sub.mpesa_code ?? "-")")
                     .font(.psCaption)
                     .foregroundStyle(.psMuted)
@@ -219,7 +247,7 @@ struct AdminSubscriptionsRootView: View {
                 selected = sub
             }
         }
-        .accessibilityLabel("Order \(sub.id), \(sub.service_requested), \(sub.status)")
+        .accessibilityLabel("Order \(sub.id), \(sub.customerDisplayName), \(sub.service_requested), \(sub.status)")
     }
 
     private func statusIcon(_ status: String) -> String {
@@ -329,6 +357,14 @@ struct AdminSubscriptionDetailSheet: View {
                         }
                     }
                     PSCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            PSSectionHeader(title: "Customer")
+                            AdminKVRow(label: "Name", value: subscription.customerDisplayName)
+                            AdminKVRow(label: "WhatsApp", value: subscription.customer_whatsapp ?? "-")
+                            AdminKVRow(label: "Email", value: subscription.customer_email ?? "-")
+                        }
+                    }
+                    PSCard {
                         VStack(alignment: .leading, spacing: 12) {
                             PSSectionHeader(title: "Edit")
                             Picker("Status", selection: $status) {
@@ -384,6 +420,17 @@ struct AdminSubscriptionDetailSheet: View {
                     PSCard {
                         VStack(alignment: .leading, spacing: 10) {
                             PSSectionHeader(title: "Actions")
+                            HStack(spacing: 10) {
+                                Button("Approve") { Task { await approve() } }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.psPrimary)
+                                    .disabled(isWorking)
+                                    .accessibilityLabel("Approve subscription")
+                                Button("Reject", role: .destructive) { Task { await reject() } }
+                                    .buttonStyle(.bordered)
+                                    .disabled(isWorking)
+                                    .accessibilityLabel("Reject subscription")
+                            }
                             HStack(spacing: 10) {
                                 Button("Renew") { Task { await renew() } }
                                     .buttonStyle(.bordered)
@@ -463,6 +510,42 @@ struct AdminSubscriptionDetailSheet: View {
         do {
             _ = try await APIClient.shared.putOK("api/v1/admin/subscriptions/\(subscription.id)", body: body)
             message = "Changes saved."
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func approve() async {
+        // POST /api/v1/admin/subscriptions/<id>/approve, the same
+        // action as the pending card. Vault email and password come
+        // from the Edit fields above; approval needs both.
+        guard !vaultEmail.isEmpty, !vaultPassword.isEmpty else {
+            message = "Enter the vault email and password above to approve."
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await APIClient.shared.adminApprove(
+                subscriptionId: subscription.id,
+                vaultEmail: vaultEmail,
+                vaultPassword: vaultPassword,
+                accountGroup: accountGroup.isEmpty ? "Unassigned" : accountGroup)
+            message = "Subscription approved."
+            onDone()
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func reject() async {
+        // POST /api/v1/admin/subscriptions/<id>/reject.
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await APIClient.shared.adminReject(subscriptionId: subscription.id)
+            message = "Subscription rejected."
+            onDone()
         } catch {
             message = error.localizedDescription
         }

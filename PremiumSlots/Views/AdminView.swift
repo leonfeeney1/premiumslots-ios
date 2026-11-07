@@ -38,7 +38,12 @@ struct AdminView: View {
             } message: {
                 Text(errorMessage)
             }
-            .task { await appState.refreshAdmin() }
+            .task {
+                await appState.refreshAdmin()
+                if appState.isAdminLoggedIn {
+                    appState.adminNotifier.start()
+                }
+            }
             .safeAreaPadding(.bottom, 8)
         }
     }
@@ -50,7 +55,7 @@ struct AdminView: View {
             RealLogoView(size: 48)
             Text("Admin sign-in")
                 .font(.psTitle)
-            Text("This is a separate sign-in from a customer account. It unlocks the live admin dashboard on premiumslots.tech.")
+            Text("This is a separate sign-in from a customer account. It unlocks the live admin dashboard.")
                 .font(.psBody)
                 .foregroundStyle(.psMuted)
             SecureField("Admin password", text: $password)
@@ -72,7 +77,7 @@ struct AdminView: View {
             .psPrimary()
             .disabled(isSubmitting || password.isEmpty)
             if appState.liveState != .live {
-                Text("Admin needs the live API. It is not reachable right now, so sign-in will fail until the /api/v1 backend is deployed.")
+                Text("Admin needs a connection. Check your connection and try again.")
                     .font(.psCaption)
                     .foregroundStyle(.psAmber)
             }
@@ -92,6 +97,38 @@ struct AdminView: View {
                 }
                 .font(.psCaption)
             }
+
+            NavigationLink {
+                AdminNotificationsRootView()
+            } label: {
+                HStack {
+                    Label("Notifications", systemImage: "bell.fill")
+                        .font(.psBody)
+                    Spacer()
+                    if appState.adminUnreadCount > 0 {
+                        Text("\(appState.adminUnreadCount)")
+                            .font(.psCaption)
+                            .foregroundStyle(.psObsidian)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.psAmber)
+                            .clipShape(Capsule())
+                            .accessibilityLabel("\(appState.adminUnreadCount) unread admin notifications")
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(14)
+                .background(Color.psSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.psBorder, lineWidth: 1)
+                )
+            }
+            .accessibilityLabel("Open admin notifications")
 
             if appState.liveState != .live, appState.adminStats == nil {
                 Text("Admin needs the live API. The service is not reachable right now, so no admin data is shown.")
