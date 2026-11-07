@@ -186,8 +186,10 @@ struct AdminCustomersRootView: View {
                 Task { await load() }
             }
         }
-        .sheet(item: $shareURL) { url in
-            AdminShareSheet(urls: [url])
+        .sheet(isPresented: Binding(get: { shareURL != nil }, set: { if !$0 { shareURL = nil } })) {
+            if let url = shareURL {
+                AdminShareSheet(urls: [url])
+            }
         }
         .alert("Bulk action", isPresented: $showBulkConfirm) {
             Button("\(bulkActionLabel) \(selectedIds.count) customers", role: .destructive) {

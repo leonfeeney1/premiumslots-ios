@@ -169,8 +169,10 @@ struct AdminAnalyticsRootView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
-        .sheet(item: $shareURL) { url in
-            AdminShareSheet(urls: [url])
+        .sheet(isPresented: Binding(get: { shareURL != nil }, set: { if !$0 { shareURL = nil } })) {
+            if let url = shareURL {
+                AdminShareSheet(urls: [url])
+            }
         }
     }
 
@@ -547,9 +549,4 @@ struct AdminFinancialEngineView: View {
             errorMessage = error.localizedDescription
         }
     }
-}
-
-// URL is Identifiable for the share sheet binding.
-extension URL: Identifiable {
-    var id: String { absoluteString }
 }

@@ -597,8 +597,10 @@ struct AdminSecurityLogsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .refreshable { await load() }
-        .sheet(item: $shareURL) { url in
-            AdminShareSheet(urls: [url])
+        .sheet(isPresented: Binding(get: { shareURL != nil }, set: { if !$0 { shareURL = nil } })) {
+            if let url = shareURL {
+                AdminShareSheet(urls: [url])
+            }
         }
         .alert("Purge all security logs?", isPresented: $showPurgeConfirm) {
             Button("Purge all", role: .destructive) { Task { await purge() } }

@@ -82,9 +82,17 @@ struct PSSectionHeader: View {
 struct PSEmptyState: View {
     let systemImage: String
     let title: String
-    let body: String
+    let message: String
     var actionLabel: String?
     var action: (() -> Void)?
+
+    init(systemImage: String, title: String, body: String, actionLabel: String? = nil, action: (() -> Void)? = nil) {
+        self.systemImage = systemImage
+        self.title = title
+        self.message = body
+        self.actionLabel = actionLabel
+        self.action = action
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -95,7 +103,7 @@ struct PSEmptyState: View {
             Text(title)
                 .font(.psHeadline)
                 .multilineTextAlignment(.center)
-            Text(body)
+            Text(message)
                 .font(.psBody)
                 .foregroundStyle(.psMuted)
                 .multilineTextAlignment(.center)
