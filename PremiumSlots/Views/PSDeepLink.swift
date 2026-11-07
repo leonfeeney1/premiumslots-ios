@@ -29,7 +29,7 @@ enum PSDeepLink: Equatable, Identifiable {
     case wallet
     case catalogue
     case dashboard
-    case giftCards
+    case giftCards(String?)
     case help
     case wishlist
     case home
@@ -42,7 +42,7 @@ enum PSDeepLink: Equatable, Identifiable {
         case .wallet: return "wallet"
         case .catalogue: return "catalogue"
         case .dashboard: return "dashboard"
-        case .giftCards: return "gift-cards"
+        case .giftCards(let code): return "gift-cards-\(code ?? "")"
         case .help: return "help"
         case .wishlist: return "wishlist"
         case .home: return "home"
@@ -77,13 +77,18 @@ enum PSDeepLink: Equatable, Identifiable {
         if let link = notification.link, !link.isEmpty {
             switch link {
             case "/wallet": return .wallet
-            case "/gift-cards": return .giftCards
+            case "/gift-cards": return .giftCards(nil)
             case "/my-tickets": return .ticket(ticketId(from: notificationText(notification)))
             case "/wishlist": return .wishlist
             case "/help": return .help
             case "/store": return .catalogue
             case "/": return .home
             default: break
+            }
+            if link.hasPrefix("/gift-cards?code=") {
+                let code = String(link.dropFirst("/gift-cards?code=".count))
+                    .components(separatedBy: "&").first ?? ""
+                return .giftCards(code.isEmpty ? nil : code)
             }
             if link.hasPrefix("/subscription/") {
                 let tail = link.dropFirst("/subscription/".count)
@@ -95,6 +100,13 @@ enum PSDeepLink: Equatable, Identifiable {
 
         let text = notificationText(notification)
         let kind = notification.kindKey ?? ""
+
+        // Gift cards: the code travels with the notification when
+        // the text carries one (v7: GIFT-XXXX-XXXX in the title or
+        // body), so the verify sheet opens prefilled.
+        if kind.contains("gift") || text.lowercased().contains("gift card") {
+            return .giftCards(giftCardCode(from: text))
+        }
 
         // Ticket first: "Ticket #12 received" names its ticket.
         if kind.contains("ticket") || text.lowercased().contains("ticket") {
@@ -134,6 +146,16 @@ enum PSDeepLink: Equatable, Identifiable {
         let rest = text[text.index(after: hash)...]
         let digits = rest.prefix(while: { $0.isNumber })
         return Int(digits)
+    }
+
+    /// A GIFT-XXXX-XXXX code in the text, for gift-card
+    /// notifications, so the verify sheet opens prefilled.
+    private static func giftCardCode(from text: String) -> String? {
+        guard let range = text.range(of: "GIFT-") else { return nil }
+        let tail = String(text[range.lowerBound...])
+        let code = tail.prefix(14)
+        guard code.count == 14 else { return nil }
+        return String(code)
     }
 
     /// First subscription whose service name (or first word of it)

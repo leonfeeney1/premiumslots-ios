@@ -651,10 +651,12 @@ struct PSLoyaltyLedgerRow: View {
 // MARK: - Achievements root
 
 struct AchievementsRootView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var data: PSAchievementsData?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var filter = "all"
+    @State private var showAuth = false
 
     private var badges: [PSBadgeDefinition] {
         data?.badges ?? []
@@ -692,7 +694,25 @@ struct AchievementsRootView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if isLoading, data == nil {
+                if !appState.isLoggedIn {
+                    ScrollView {
+                        PSCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Sign in to see your achievements")
+                                    .font(.psHeadline)
+                                Text("Badges you earn live on your PremiumSlots account. Sign in to see which ones you have earned.")
+                                    .font(.psBody)
+                                    .foregroundStyle(.psMuted)
+                                Button("Sign in") { showAuth = true }
+                                    .psPrimary()
+                                    .accessibilityLabel("Sign in to see your achievements")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .psScreenPadding()
+                    }
+                    .scrollIndicators(.hidden)
+                } else if isLoading, data == nil {
                     VStack(spacing: 16) {
                         PSRingSpinner()
                         Text("Loading achievements")
@@ -712,6 +732,10 @@ struct AchievementsRootView: View {
             .navigationTitle("Achievements")
             .navigationBarTitleDisplayMode(.inline)
             .task { await load() }
+            .sheet(isPresented: $showAuth) {
+                AuthView()
+                    .psSheetDetents()
+            }
         }
     }
 
@@ -788,6 +812,7 @@ struct AchievementsRootView: View {
     }
 
     private func load() async {
+        guard appState.isLoggedIn else { return }
         if data == nil { isLoading = true }
         defer { isLoading = false }
         do {

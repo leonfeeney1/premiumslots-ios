@@ -36,6 +36,13 @@ func psStyledMarkdown(_ text: String) -> Text {
     return Text(text)
 }
 
+/// Display form of a server category slug: "getting-started" reads
+/// as "Getting Started". Display only; the raw slug is still what
+/// gets sent to the server as the filter value.
+func psHumanizeSlug(_ slug: String) -> String {
+    slug.split(separator: "-").map { psCapitalized(String($0)) }.joined(separator: " ")
+}
+
 // MARK: - Help centre
 
 struct HelpRootView: View {
@@ -94,13 +101,13 @@ struct HelpRootView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.self) { category in
-                            Button(category) {
+                            Button(psHumanizeSlug(category)) {
                                 selectedCategory = category
                                 Task { await load() }
                             }
                             .buttonStyle(.bordered)
                             .tint(selectedCategory == category ? .psCyan : .psMuted)
-                            .accessibilityLabel("Filter by \(category)")
+                            .accessibilityLabel("Filter by \(psHumanizeSlug(category))")
                         }
                     }
                 }
@@ -147,7 +154,7 @@ struct HelpRootView: View {
                                 }
                                 HStack(spacing: 8) {
                                     if let category = article.category {
-                                        Text(category)
+                                        Text(psHumanizeSlug(category))
                                             .font(.psCaption)
                                             .foregroundStyle(.psMuted)
                                     }
@@ -265,7 +272,7 @@ struct HelpArticleDetailView: View {
                     Text(article.title)
                         .font(.psTitle)
                     if let category = article.category {
-                        PSStatusPill(text: category, systemImage: "tag.fill", tint: .psCyan)
+                        PSStatusPill(text: psHumanizeSlug(category), systemImage: "tag.fill", tint: .psCyan)
                     }
                     if let updated = article.updated_at {
                         Text("Updated \(psShortDate(updated))")

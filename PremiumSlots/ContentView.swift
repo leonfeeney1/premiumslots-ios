@@ -150,8 +150,8 @@ struct ContentView: View {
             NavigationStack {
                 DashboardRootView()
             }
-        case .giftCards:
-            GiftCardsRootView()
+        case .giftCards(let code):
+            GiftCardsRootView(prefillVerifyCode: code)
         case .help:
             NavigationStack {
                 HelpRootView()

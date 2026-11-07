@@ -95,11 +95,20 @@ struct HomeView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
+        // A successful-but-empty catalogue must not blank Home when
+        // a saved or bundled list is already on screen: keep that
+        // list and show the "Saved catalogue" pill instead.
+        let previousPlatforms = appState.platforms
         // Catalogue: refreshCatalogue never throws. It keeps the
         // saved catalogue and marks the state offline when the API
         // cannot be reached, so this call alone can never fail the
         // refresh.
         await appState.refreshCatalogue()
+        if appState.platforms.isEmpty, !previousPlatforms.isEmpty {
+            appState.platforms = previousPlatforms
+            appState.liveState = .offline
+            appState.refreshMessage = "Saved catalogue"
+        }
         // Subscriptions: refreshMySubscriptions guards its own
         // failure internally and keeps the last list, so this call
         // cannot fail the refresh either.

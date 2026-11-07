@@ -225,10 +225,18 @@ struct AdminNotSignedInView: View {
 // MARK: - Analytics payloads
 // GET /api/v1/admin/analytics returns the new contract:
 // {"ok": true, "revenue_by_day": [{"day", "revenue", "orders"}],
-//  "by_service": [{"service", "revenue", "orders"}],
+//  "by_service": [{"service", "count", "active_count"}],
 //  "by_status": [{"status", "count"}],
 //  "churn": null | {"count": Int, "users": [...], "note": String},
-//  "totals": {"revenue": Int, "orders": Int}}
+//  "totals": {"revenue": Int, "orders": Int},
+//  "totals_all_time": {"revenue": Int, "revenue_this_month": Int}}
+// by_service is the subscriptions-by-service COUNT breakdown, not
+// revenue: the revenue-by-service rows come from the financial
+// engine (/api/v1/admin/financial-engine) when by_service carries
+// no revenue, and AdminByServiceRow reads both shapes. totals is
+// the WINDOW totals for the requested days; the all-time revenue
+// lives under totals_all_time and is what the "Total revenue"
+// tile reads.
 // The live backend in the workspace still returns the older keys
 // (daily_revenue, churn_users, churn_count, churn_note, plus
 // top_services / status as labels-and-data objects and a totals
@@ -409,6 +417,7 @@ struct AdminAnalyticsResponse: Decodable {
     let status: String?
     let dailyRevenue: [AdminDailyRevenue]
     let totals: AdminAnalyticsTotals?
+    let totalsAllTime: AdminAnalyticsTotals?
     var byService: [AdminByServiceRow]?
     var byStatus: [AdminByStatusRow]?
     var subscriptionsByService: [AdminSubsByServiceRow]?
@@ -438,7 +447,7 @@ struct AdminAnalyticsResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case ok, days, service, status
         case revenue_by_day, daily_revenue
-        case totals
+        case totals, totals_all_time
         case by_service, top_services
         case by_status
         case subscriptions_by_service, subscriptions_by_status, tickets_by_status
@@ -460,6 +469,7 @@ struct AdminAnalyticsResponse: Decodable {
         let oldDays = (try? container.decodeIfPresent([AdminDailyRevenue].self, forKey: .daily_revenue)) ?? nil
         dailyRevenue = newDays ?? oldDays ?? []
         totals = (try? container.decodeIfPresent(AdminAnalyticsTotals.self, forKey: .totals)) ?? nil
+        totalsAllTime = (try? container.decodeIfPresent(AdminAnalyticsTotals.self, forKey: .totals_all_time)) ?? nil
         var serviceRows = (try? container.decodeIfPresent([AdminByServiceRow].self, forKey: .by_service)) ?? nil
         if serviceRows == nil,
            let series = (try? container.decodeIfPresent(AdminLabelledSeries.self, forKey: .top_services)) ?? nil,
@@ -645,7 +655,7 @@ struct AdminAnalyticsRootView: View {
             )
             AdminKPITile(
                 label: "Total revenue",
-                value: response?.totals?.revenue.map { "KES \($0)" },
+                value: (response?.totalsAllTime?.revenue ?? response?.totals?.revenue).map { "KES \($0)" },
                 systemImage: "chart.bar.fill",
                 tint: .psPrimary
             )
@@ -738,10 +748,26 @@ struct AdminAnalyticsRootView: View {
                             .foregroundStyle(.psMuted)
                     }
                     ForEach(rows, id: \.service_requested) { row in
-                        AdminKVRow(
-                            label: "\(row.service_requested ?? "Service") (\(row.orders ?? 0) orders)",
-                            value: row.revenue.map { "KES \($0)" } ?? "Not available yet"
-                        )
+                        if let revenue = row.revenue {
+                            AdminKVRow(
+                                label: "\(row.service_requested ?? "Service") (\(row.orders ?? 0) orders)",
+                                value: "KES \(revenue)"
+                            )
+                        } else if let count = row.count {
+                            // Count breakdown row ({service, count,
+                            // active_count}): no revenue to show, so
+                            // show the subscription count plainly
+                            // instead of "Not available yet".
+                            AdminKVRow(
+                                label: "\(row.service_requested ?? "Service") (\(row.activeCount ?? 0) active)",
+                                value: "\(count) subscriptions"
+                            )
+                        } else {
+                            AdminKVRow(
+                                label: row.service_requested ?? "Service",
+                                value: "Not available yet"
+                            )
+                        }
                     }
                 } else {
                     AdminUnavailableText()
@@ -913,13 +939,18 @@ struct AdminAnalyticsRootView: View {
             }
             AdminCache.save(data, key: cacheKey)
             // Revenue by service lives in the financial engine on
-            // older backends: fill it from there so the section
-            // shows real numbers instead of "Not available yet"
-            // when the data does exist.
-            if result.byService == nil,
+            // older backends, and the analytics by_service list is
+            // a subscription-count breakdown with no revenue in it:
+            // fill the revenue rows from the engine whenever the
+            // list carries no revenue row at all, not only when
+            // the list itself is missing. Keep the count rows when
+            // the engine has nothing better, so the section still
+            // shows the counts instead of going blank.
+            let byServiceHasRevenue = result.byService?.contains(where: { $0.hasRevenue }) ?? false
+            if !byServiceHasRevenue,
                let engine: AdminFinancialEngineResponse = try? await APIClient.shared.fetchJSON("api/v1/admin/financial-engine"),
-               engine.ok {
-                result.byService = engine.by_service
+               engine.ok, let engineRows = engine.by_service, !engineRows.isEmpty {
+                result.byService = engineRows
             }
             response = result
         } catch {
@@ -972,15 +1003,25 @@ struct AdminByServiceRow: Decodable {
     let service_requested: String?
     let revenue: Int?
     let orders: Int?
+    /// Subscription count, when the row is a count breakdown
+    /// ({service, count, active_count}) rather than a revenue row.
+    /// A count row has no revenue: its revenue stays nil and the
+    /// section shows the count instead of "Not available yet".
+    let count: Int?
+    let activeCount: Int?
+
+    var hasRevenue: Bool { revenue != nil }
 
     init(service: String, revenue: Int?, orders: Int?) {
         self.service_requested = service
         self.revenue = revenue
         self.orders = orders
+        self.count = nil
+        self.activeCount = nil
     }
 
     enum CodingKeys: String, CodingKey {
-        case service_requested, service, name, revenue, total, monthly_recurring, orders, count, n
+        case service_requested, service, name, revenue, total, monthly_recurring, orders, count, n, active_count, activeCount
     }
 
     init(from decoder: Decoder) throws {
@@ -992,8 +1033,10 @@ struct AdminByServiceRow: Decodable {
             ?? container.adminInt(forKey: .total)
             ?? container.adminInt(forKey: .monthly_recurring)
         orders = container.adminInt(forKey: .orders)
-            ?? container.adminInt(forKey: .count)
             ?? container.adminInt(forKey: .n)
+        count = container.adminInt(forKey: .count)
+        activeCount = container.adminInt(forKey: .active_count)
+            ?? container.adminInt(forKey: .activeCount)
     }
 }
 

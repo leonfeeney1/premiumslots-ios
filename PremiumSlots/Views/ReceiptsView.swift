@@ -99,13 +99,13 @@ struct ReceiptListItem: Decodable, Identifiable {
         } else {
             service = "Subscription"
         }
-        if let value = try? container.decode(Int.self, forKey: .amount) {
-            amount = value
-        } else if let value = try? container.decode(Int.self, forKey: .amount_kes) {
-            amount = value
-        } else {
-            amount = nil
+        // Amount may arrive as 180, 180.0 or "180": a strict Int
+        // decode drops the price entirely when the server sends a
+        // decimal, so read all three forms for both keys.
+        let flexibleAmount: (CodingKeys) -> Int? = { key in
+            (try? container.decodeIfPresent(AdminFlexInt.self, forKey: key))??.value
         }
+        amount = flexibleAmount(.amount) ?? flexibleAmount(.amount_kes)
         if let text = try? container.decode(String.self, forKey: .created_at), !text.isEmpty {
             createdAt = text
         } else if let text = try? container.decode(String.self, forKey: .date),
@@ -161,6 +161,22 @@ private struct ReceiptsLedgerRow: Decodable {
     let action_type: String?
     let amount: Int?
     let created_at: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, service_requested, description, action_type, amount, created_at
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(Int.self, forKey: .id)
+        service_requested = try container.decodeIfPresent(String.self, forKey: .service_requested)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        action_type = try container.decodeIfPresent(String.self, forKey: .action_type)
+        // Ledger amounts arrive as 180 or 180.0: a strict Int
+        // decode would fail the whole dashboard fallback list.
+        amount = (try? container.decodeIfPresent(AdminFlexInt.self, forKey: .amount))??.value
+        created_at = try container.decodeIfPresent(String.self, forKey: .created_at)
+    }
 }
 
 struct ReceiptVerifyDetail: Decodable {
@@ -171,6 +187,23 @@ struct ReceiptVerifyDetail: Decodable {
     let customer: String?
     let email: String?
     let ts: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, service, amount, action, customer, email, ts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(Int.self, forKey: .id)
+        service = try container.decodeIfPresent(String.self, forKey: .service)
+        // Verify data amounts arrive as 180 or 180.0: a strict Int
+        // decode would fail the whole verify response.
+        amount = (try? container.decodeIfPresent(AdminFlexInt.self, forKey: .amount))??.value
+        action = try container.decodeIfPresent(String.self, forKey: .action)
+        customer = try container.decodeIfPresent(String.self, forKey: .customer)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        ts = try container.decodeIfPresent(String.self, forKey: .ts)
+    }
 }
 
 struct ReceiptVerifyDetailResponse: Decodable {
@@ -311,7 +344,7 @@ struct ReceiptsPickerView: View {
             }
 
             Section {
-                Text("Paste the full receipt code from the receipt, or paste the payload and signature separately. Extra spaces and the PS- prefix are ignored.")
+                Text("Paste the full receipt code or verify link from the receipt, or paste the payload and signature separately. Extra spaces and the PS- prefix are ignored.")
                     .font(.psBody)
                     .foregroundStyle(.psMuted)
                 TextField("Paste receipt code", text: $combinedCode)
@@ -522,12 +555,27 @@ struct ReceiptsPickerView: View {
     /// Tolerant parsing of a pasted receipt code. Trims whitespace,
     /// strips common prefixes ("PS-", "PS:", "Receipt:", "Payload:",
     /// "Signature:"), and splits a combined paste into payload and
-    /// signature on whitespace, a dot or a pipe. The payload is
-    /// base64url, which is case sensitive, so it is kept exactly as
-    /// pasted: uppercasing it would corrupt it and break the HMAC
-    /// check. The signature is hex, so it is lowercased to match
-    /// the lowercase hexdigest the server compares against.
+    /// signature on whitespace, a dot or a pipe. A pasted full
+    /// verify link (https://premiumslots.tech/.../verify?payload=...
+    /// &signature=...) is read from its query items first: splitting
+    /// it on dots would chop the host and the payload apart. The
+    /// payload is base64url, which is case sensitive, so it is kept
+    /// exactly as pasted: uppercasing it would corrupt it and break
+    /// the HMAC check. The signature is hex, so it is lowercased to
+    /// match the lowercase hexdigest the server compares against.
     static func parsePastedCode(combined: String, payload: String, signature: String) -> (payload: String, signature: String) {
+        // Pull payload and signature out of a pasted verify link.
+        // Returns nil unless both query items are present.
+        let fromVerifyLink: (String) -> (String, String)? = { text in
+            guard let url = URL(string: text),
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let items = components.queryItems,
+                  let linkPayload = items.first(where: { $0.name == "payload" })?.value,
+                  !linkPayload.isEmpty,
+                  let linkSignature = items.first(where: { $0.name == "signature" })?.value,
+                  !linkSignature.isEmpty else { return nil }
+            return (linkPayload, linkSignature.lowercased())
+        }
         let stripPrefixes: (String) -> String = { value in
             var text = value.trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = text.lowercased()
@@ -542,6 +590,9 @@ struct ReceiptsPickerView: View {
         }
         let combinedText = stripPrefixes(combined)
         if !combinedText.isEmpty {
+            if let fromLink = fromVerifyLink(combinedText) {
+                return fromLink
+            }
             let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ".|"))
             let tokens = combinedText.components(separatedBy: separators).filter { !$0.isEmpty }
             if tokens.count >= 2 {
@@ -558,6 +609,10 @@ struct ReceiptsPickerView: View {
                 return (single, stripPrefixes(signature).lowercased())
             }
         }
-        return (stripPrefixes(payload), stripPrefixes(signature).lowercased())
+        let payloadText = stripPrefixes(payload)
+        if let fromLink = fromVerifyLink(payloadText) {
+            return fromLink
+        }
+        return (payloadText, stripPrefixes(signature).lowercased())
     }
 }

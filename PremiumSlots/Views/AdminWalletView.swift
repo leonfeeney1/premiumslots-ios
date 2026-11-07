@@ -484,33 +484,99 @@ struct AdminCustomerWalletDetailResponse: Decodable {
 
 // MARK: - Gift cards (admin)
 // GET /api/v1/admin/gift-cards returns:
-// {"ok": true, "gift_cards": [GiftCards rows], "enabled": String}
-// GiftCards rows are flat _row_dict rows: id, code, amount, status,
-// recipient_name, recipient_email, sender_name, message, theme_style,
-// created_at. Approve/reject take {"id": ...} or {"code": ...} and
-// return {"status": "active"} or {"status": "rejected"}.
-// Resend takes {"code": ...} and returns {"resent_to": email}.
-// Issue takes {"amount", "code"?, "recipient_name", "recipient_email",
-// "message", "theme_style"} and returns
-// {"gift_card_id", "code", "amount"}.
+// {"ok": true, "gift_cards": [_gift_card_row rows], "enabled": String,
+//  "metrics": {"total", "pending", "active", "revenue"} when present}
+// _gift_card_row rows carry amount = initial_amount, message =
+// custom_message, expiry_date = expires_at, plus the raw columns
+// (initial_amount, custom_message, mpesa_code, sender_name,
+// sender_email, payment_reference, admin_notes). Both the mapped
+// keys and the raw keys are decoded, mapped key first, so rows
+// read correctly whether or not the backend maps them. Statuses
+// are capitalised: Pending / Approved / Active / Redeemed /
+// Rejected / Expired. Approve sets Approved; reject sets Rejected
+// with an admin_notes reason; resend sends the styled voucher
+// email with the real amount. Issue validates 50-50,000, stores
+// initial_amount = remaining_balance = amount, status Approved,
+// code GIFT-XXXX-XXXX. The toggle posts {"enabled": Bool} to
+// /api/v1/admin/settings/gift-cards; the Settings key itself
+// (enable_gift_cards) lives server-side.
 
 struct AdminGiftCardRow: Decodable, Identifiable, Equatable {
     let id: Int
     let code: String?
     let amount: Int?
+    let initial_amount: Int?
     let status: String?
     let recipient_name: String?
     let recipient_email: String?
     let sender_name: String?
+    let sender_email: String?
     let message: String?
+    let custom_message: String?
+    let mpesa_code: String?
+    let payment_reference: String?
+    let admin_notes: String?
     let theme_style: String?
+    let expiry_date: String?
+    let expires_at: String?
     let created_at: String?
+
+    var displayAmount: Int? {
+        amount ?? initial_amount
+    }
+
+    var displayMessage: String? {
+        message ?? custom_message
+    }
+
+    var expiryText: String? {
+        expiry_date ?? expires_at
+    }
+}
+
+struct AdminGiftCardMetrics: Decodable {
+    let total: Int?
+    let pending: Int?
+    let active: Int?
+    let revenue: Int?
 }
 
 struct AdminGiftCardsResponse: Decodable {
     let ok: Bool
     let gift_cards: [AdminGiftCardRow]?
     let enabled: String?
+    let metrics: AdminGiftCardMetrics?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, gift_cards, enabled, metrics
+        case total, pending, active, revenue
+    }
+
+    /// enabled may arrive as a Bool or a String; metrics may arrive
+    /// nested under "metrics" or as flat top-level keys.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ok = try container.decode(Bool.self, forKey: .ok)
+        gift_cards = try container.decodeIfPresent([AdminGiftCardRow].self, forKey: .gift_cards)
+        if let enabledBool = try? container.decode(Bool.self, forKey: .enabled) {
+            enabled = enabledBool ? "true" : "false"
+        } else {
+            enabled = try container.decodeIfPresent(String.self, forKey: .enabled)
+        }
+        if let nested = try container.decodeIfPresent(AdminGiftCardMetrics.self, forKey: .metrics) {
+            metrics = nested
+        } else {
+            let total = try container.decodeIfPresent(Int.self, forKey: .total)
+            let pending = try container.decodeIfPresent(Int.self, forKey: .pending)
+            let active = try container.decodeIfPresent(Int.self, forKey: .active)
+            let revenue = try container.decodeIfPresent(Int.self, forKey: .revenue)
+            if total == nil && pending == nil && active == nil && revenue == nil {
+                metrics = nil
+            } else {
+                metrics = AdminGiftCardMetrics(total: total, pending: pending, active: active, revenue: revenue)
+            }
+        }
+    }
 }
 
 struct AdminGiftCardsRootView: View {
@@ -524,6 +590,8 @@ struct AdminGiftCardsRootView: View {
     @State private var isWorking = false
     @State private var confirmApprove: AdminGiftCardRow?
     @State private var confirmReject: AdminGiftCardRow?
+    @State private var rejectReason = ""
+    @State private var metrics: AdminGiftCardMetrics?
 
     var body: some View {
         Group {
@@ -581,20 +649,42 @@ struct AdminGiftCardsRootView: View {
             Text("This activates the gift card.")
         }
         .alert("Reject gift card?", isPresented: .constant(confirmReject != nil)) {
+            TextField("Reason (optional)", text: $rejectReason)
             Button("Reject", role: .destructive) {
                 if let card = confirmReject {
                     confirmReject = nil
                     Task { await setStatus(card, approve: false) }
                 }
             }
-            Button("Cancel", role: .cancel) { confirmReject = nil }
+            Button("Cancel", role: .cancel) {
+                confirmReject = nil
+                rejectReason = ""
+            }
         } message: {
-            Text("This rejects the gift card.")
+            Text("This rejects the gift card. The reason is saved as the admin note.")
         }
     }
 
     private var content: some View {
         List {
+            if let metrics, metrics.total != nil || metrics.pending != nil || metrics.active != nil || metrics.revenue != nil {
+                Section("Gift card totals") {
+                    HStack(spacing: 16) {
+                        if let total = metrics.total {
+                            metricCell(label: "Total", value: "\(total)")
+                        }
+                        if let pending = metrics.pending {
+                            metricCell(label: "Pending", value: "\(pending)")
+                        }
+                        if let active = metrics.active {
+                            metricCell(label: "Active", value: "\(active)")
+                        }
+                        if let revenue = metrics.revenue {
+                            metricCell(label: "Revenue", value: psKESGrouped(revenue))
+                        }
+                    }
+                }
+            }
             Section {
                 Toggle("Gift cards enabled", isOn: $enabled)
                     .font(.psBody)
@@ -629,26 +719,55 @@ struct AdminGiftCardsRootView: View {
         .scrollIndicators(.hidden)
     }
 
+    private func metricCell(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.psHeadline)
+            Text(label)
+                .font(.psCaption)
+                .foregroundStyle(.psMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func giftCardRow(_ card: AdminGiftCardRow) -> some View {
+        let statusLower = (card.status ?? "").lowercased()
+        let needsDecision = statusLower.isEmpty || statusLower == "pending"
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(card.code ?? "Card #\(card.id)")
                     .font(.psMono)
                 Spacer()
-                Text("KES \(card.amount ?? 0)")
+                Text(psKESGrouped(card.displayAmount))
                     .font(.psHeadline)
             }
             Text("\(card.recipient_name ?? "-") · \(card.recipient_email ?? "-")")
                 .font(.psCaption)
                 .foregroundStyle(.psMuted)
+            if let sender = card.sender_name, !sender.isEmpty {
+                Text("From \(sender)")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
+            }
+            if let mpesaCode = card.mpesa_code, !mpesaCode.isEmpty {
+                Text("M-PESA code \(mpesaCode)")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
+            }
+            if let expiry = card.expiryText {
+                Text("Expires \(adminShortDate(expiry))")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
+            }
+            if let message = card.displayMessage, !message.isEmpty {
+                Text(message)
+                    .font(.psBody)
+                    .foregroundStyle(.psDim)
+            }
             HStack(spacing: 8) {
-                PSStatusPill(
-                    text: card.status ?? "-",
-                    systemImage: "tag.fill",
-                    tint: (card.status ?? "").lowercased() == "active" ? .psSuccess : .psAmber
-                )
-                if let theme = card.theme_style, !theme.isEmpty {
-                    Text(theme)
+                psGiftCardStatusPill(status: card.status)
+                if let themeName = PSGiftCardTheme.theme(named: card.theme_style)?.name ?? card.theme_style, !themeName.isEmpty {
+                    Text(themeName)
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
                 }
@@ -659,15 +778,17 @@ struct AdminGiftCardsRootView: View {
                     .tint(.psCyan)
                     .font(.psCaption)
                     .disabled(isWorking)
-                Button("Approve") { confirmApprove = card }
-                    .buttonStyle(.bordered)
-                    .tint(.psPrimary)
-                    .font(.psCaption)
-                    .disabled(isWorking)
-                Button("Reject", role: .destructive) { confirmReject = card }
-                    .buttonStyle(.bordered)
-                    .font(.psCaption)
-                    .disabled(isWorking)
+                if needsDecision {
+                    Button("Approve") { confirmApprove = card }
+                        .buttonStyle(.bordered)
+                        .tint(.psPrimary)
+                        .font(.psCaption)
+                        .disabled(isWorking)
+                    Button("Reject", role: .destructive) { confirmReject = card }
+                        .buttonStyle(.bordered)
+                        .font(.psCaption)
+                        .disabled(isWorking)
+                }
             }
         }
         .padding(.vertical, 4)
@@ -686,6 +807,7 @@ struct AdminGiftCardsRootView: View {
                 return
             }
             cards = result.gift_cards ?? []
+            metrics = result.metrics
             enabled = (result.enabled ?? "true").lowercased() == "true"
         } catch {
             errorMessage = error.localizedDescription
@@ -727,11 +849,18 @@ struct AdminGiftCardsRootView: View {
 
     private func setStatus(_ card: AdminGiftCardRow, approve: Bool) async {
         // POST /api/v1/admin/gift-cards/approve|reject, body {"id": ...}.
+        // Reject also carries the admin_notes reason from the alert.
         let path = approve ? "api/v1/admin/gift-cards/approve" : "api/v1/admin/gift-cards/reject"
+        var body: [String: Any] = ["id": card.id]
+        let reason = rejectReason.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !approve, !reason.isEmpty {
+            body["admin_notes"] = reason
+        }
+        rejectReason = ""
         isWorking = true
         defer { isWorking = false }
         do {
-            _ = try await APIClient.shared.fetchOK(path, method: "POST", body: ["id": card.id])
+            _ = try await APIClient.shared.fetchOK(path, method: "POST", body: body)
             message = "Gift card \(card.code ?? "#\(card.id)") \(approve ? "approved" : "rejected")."
             await load()
         } catch {
@@ -747,10 +876,11 @@ struct AdminIssueGiftCardSheet: View {
     @State private var recipientName = ""
     @State private var recipientEmail = ""
     @State private var messageText = ""
-    @State private var themeStyle = ""
+    @State private var themeId = "gold"
     @State private var isWorking = false
     @State private var message: String?
     @State private var issuedCode: String?
+    @State private var issuedAmount: Int?
 
     var body: some View {
         NavigationStack {
@@ -762,6 +892,9 @@ struct AdminIssueGiftCardSheet: View {
                             TextField("Amount (KES)", text: $amount)
                                 .keyboardType(.numberPad)
                                 .psTextField()
+                            Text("Amount from KES 50 to KES 50,000. The card is approved at once and emailed to the recipient.")
+                                .font(.psCaption)
+                                .foregroundStyle(.psMuted)
                             TextField("Recipient name", text: $recipientName)
                                 .autocorrectionDisabled()
                                 .psTextField()
@@ -772,22 +905,59 @@ struct AdminIssueGiftCardSheet: View {
                                 .psTextField()
                             TextField("Message (optional)", text: $messageText)
                                 .psTextField()
-                            TextField("Theme (optional)", text: $themeStyle)
-                                .autocorrectionDisabled()
-                                .psTextField()
+                            PSSectionHeader(title: "Theme")
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                ForEach(PSGiftCardTheme.all) { theme in
+                                    Button {
+                                        themeId = theme.id
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            LinearGradient(colors: theme.colors, startPoint: .leading, endPoint: .trailing)
+                                                .frame(height: 36)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            Text(theme.name)
+                                                .font(.psCaption)
+                                                .foregroundStyle(.psText)
+                                        }
+                                        .padding(8)
+                                        .background(Color.psSurface)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(themeId == theme.id ? Color.psPrimary : Color.psBorder, lineWidth: themeId == theme.id ? 2 : 1)
+                                        )
+                                    }
+                                    .accessibilityLabel("Gift card theme \(theme.name)")
+                                }
+                            }
                             Button("Issue gift card") { Task { await issue() } }
                                 .psPrimary()
                                 .disabled(isWorking || (Int(amount) ?? 0) <= 0)
                                 .accessibilityLabel("Issue gift card")
                         }
                     }
-                    if let issuedCode {
+                    if let issuedCode, let issuedAmount {
                         PSCard {
                             VStack(alignment: .leading, spacing: 8) {
-                                PSSectionHeader(title: "Issued code")
-                                Text(issuedCode)
-                                    .font(.psMono)
+                                PSSectionHeader(title: "Gift card issued")
+                                Text("Amount \(psKESGrouped(issuedAmount))")
+                                    .font(.psBody)
+                                HStack {
+                                    Text(issuedCode)
+                                        .font(.psMono)
+                                    Button {
+                                        UIPasteboard.general.string = issuedCode
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                            .font(.psIcon)
+                                    }
+                                    .accessibilityLabel("Copy gift card code \(issuedCode)")
+                                }
+                                Text("The voucher was emailed to the recipient.")
+                                    .font(.psCaption)
+                                    .foregroundStyle(.psMuted)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     if isWorking {
@@ -818,27 +988,44 @@ struct AdminIssueGiftCardSheet: View {
     private func issue() async {
         // POST /api/v1/admin/gift-cards/issue returns
         // {"gift_card_id": Int, "code": String, "amount": Int}.
+        // The server generates the GIFT-XXXX-XXXX code and stores
+        // initial_amount = remaining_balance = amount, status Approved.
         struct IssueResponse: Decodable {
             let ok: Bool
             let gift_card_id: Int?
             let code: String?
             let amount: Int?
         }
-        guard let amountValue = Int(amount), amountValue > 0 else {
-            message = "Enter an amount."
+        guard let amountValue = Int(amount), amountValue >= 50, amountValue <= 50000 else {
+            message = "Gift card amount must be between KES 50 and KES 50,000."
             return
         }
-        var body: [String: Any] = ["amount": amountValue]
-        if !recipientName.isEmpty { body["recipient_name"] = recipientName }
-        if !recipientEmail.isEmpty { body["recipient_email"] = recipientEmail }
-        if !messageText.isEmpty { body["message"] = messageText }
-        if !themeStyle.isEmpty { body["theme_style"] = themeStyle }
+        guard !recipientName.trimmingCharacters(in: .whitespaces).isEmpty else {
+            message = "Enter the recipient name."
+            return
+        }
+        let email = recipientEmail.trimmingCharacters(in: .whitespaces)
+        guard !email.isEmpty, email.contains("@") else {
+            message = "Enter a valid recipient email so they receive their voucher."
+            return
+        }
+        var body: [String: Any] = [
+            "amount": amountValue,
+            "recipient_name": recipientName.trimmingCharacters(in: .whitespaces),
+            "recipient_email": email,
+            "theme_style": themeId
+        ]
+        if !messageText.isEmpty {
+            body["message"] = messageText
+            body["custom_message"] = messageText
+        }
         isWorking = true
         defer { isWorking = false }
         do {
             let result: IssueResponse = try await APIClient.shared.fetchJSON(
                 "api/v1/admin/gift-cards/issue", method: "POST", body: body)
             issuedCode = result.code
+            issuedAmount = result.amount ?? amountValue
             message = "Gift card issued."
         } catch {
             message = error.localizedDescription
@@ -996,25 +1183,39 @@ struct AdminTransactionsRootView: View {
 
 // MARK: - Payment methods + gateway switch
 // GET /api/v1/admin/payment-methods returns:
-// {"ok": true, "payment_gateway": "mpesa"|"stk"|"intasend",
-//  "mpesa_paybill": String, "mpesa_account": String,
-//  "mpesa_phone": String, "intasend_enabled": Bool}
-// It returns no methods array, so the screen lists the three real
-// methods from those facts: manual M-PESA and wallet are always
-// available, STK push only when IntaSend is configured.
-// POST /api/v1/admin/payment-methods saves the same keys (plus a
-// "gateway" alias) and returns {"payment_gateway": ...}. The
-// gateway switch posts there with {"gateway": ...}; picking a row
-// never posts on its own, so loading the screen cannot flip the
-// live gateway. The older code posted on every picker change,
+// {"ok": true, "payment_gateway": "mpesa"|"stk"|"both"|"intasend",
+//  "payment_method": "paybill"|"till"|"send_money"|"pochi",
+//  "rail_title", "rail_badge", "rail_instructions",
+//  "rail_short_desc", "mpesa_paybill", "mpesa_account",
+//  "mpesa_till", "mpesa_till_name", "mpesa_phone",
+//  "mpesa_recipient_name", "mpesa_pochi_phone", "mpesa_pochi_name",
+//  "intasend_enabled": Bool}
+// Two separate settings, never conflated: payment_gateway (which
+// checkout rails are offered) and payment_method (the manual
+// M-PESA rail: PayBill / Till / Send Money / Pochi La Biashara,
+// read by get_payment_method_config). POST accepts payment_method
+// and the "gateway" alias for payment_gateway and returns both.
+// The gateway switch posts there with {"gateway": ...}; picking a
+// row never posts on its own, so loading the screen cannot flip
+// the live gateway. The older code posted on every picker change,
 // including the change caused by loading the saved value.
 
 struct AdminPaymentMethodsResponse: Decodable {
     let ok: Bool
     let payment_gateway: String?
+    let payment_method: String?
+    let rail_title: String?
+    let rail_badge: String?
+    let rail_instructions: String?
+    let rail_short_desc: String?
     let mpesa_paybill: String?
     let mpesa_account: String?
+    let mpesa_till: String?
+    let mpesa_till_name: String?
     let mpesa_phone: String?
+    let mpesa_recipient_name: String?
+    let mpesa_pochi_phone: String?
+    let mpesa_pochi_name: String?
     let intasend_enabled: Bool?
 }
 
@@ -1022,6 +1223,11 @@ struct AdminPaymentMethodsView: View {
     @EnvironmentObject private var appState: AppState
     @State private var gateway = "mpesa"
     @State private var pendingGateway = "mpesa"
+    @State private var rail = "paybill"
+    @State private var pendingRail = "paybill"
+    @State private var railTitle: String?
+    @State private var railBadge: String?
+    @State private var railInstructions: String?
     @State private var paybill = ""
     @State private var account = ""
     @State private var phone = ""
@@ -1031,6 +1237,39 @@ struct AdminPaymentMethodsView: View {
     @State private var errorMessage: String?
     @State private var message: String?
     @State private var isWorking = false
+
+    /// Display name for a gateway value. "both" and "intasend"
+    /// are real values the server accepts; they used to render as
+    /// raw text with no row active.
+    private func gatewayLabel(_ value: String) -> String {
+        switch value.lowercased() {
+        case "mpesa": return "Manual M-PESA"
+        case "stk": return "STK push"
+        case "both": return "Both (Manual + STK)"
+        case "intasend": return "IntaSend"
+        default: return psCapitalized(value)
+        }
+    }
+
+    /// Display name for a manual M-PESA rail id.
+    private func railDisplayName(_ value: String) -> String {
+        switch value.lowercased() {
+        case "paybill": return "PayBill"
+        case "till": return "Till"
+        case "send_money": return "Send Money"
+        case "pochi": return "Pochi La Biashara"
+        default: return psCapitalized(value)
+        }
+    }
+
+    private var rails: [(id: String, title: String, detail: String)] {
+        [
+            ("paybill", "PayBill", "PayBill \(paybill.isEmpty ? "-" : paybill) · Account \(account.isEmpty ? "-" : account)"),
+            ("till", "Till", "Till number shown at checkout"),
+            ("send_money", "Send Money", "Send money to \(phone.isEmpty ? "-" : phone)"),
+            ("pochi", "Pochi La Biashara", "Pochi La Biashara number shown at checkout")
+        ]
+    }
 
     /// The real methods the site offers. The GET endpoint returns
     /// no methods array, only the active gateway and the IntaSend
@@ -1042,6 +1281,8 @@ struct AdminPaymentMethodsView: View {
         [
             ("mpesa", "Manual M-PESA", "PayBill \(paybill.isEmpty ? "-" : paybill) · Account \(account.isEmpty ? "-" : account)", "phone.fill"),
             ("stk", "STK push", intasendEnabled ? "IntaSend STK push to the customer phone" : "Not configured: IntaSend is not set up", "bolt.fill"),
+            ("both", "Both (Manual + STK)", intasendEnabled ? "Manual M-PESA and STK push both offered" : "Manual M-PESA offered now, STK push once IntaSend is set up", "arrow.left.arrow.right"),
+            ("intasend", "IntaSend", intasendEnabled ? "IntaSend STK push to the customer phone" : "Not configured: IntaSend is not set up", "bolt.fill"),
             ("wallet", "Wallet", "Pay from the customer wallet balance", "wallet.bifold.fill")
         ]
     }
@@ -1084,14 +1325,14 @@ struct AdminPaymentMethodsView: View {
                 PSCard {
                     VStack(alignment: .leading, spacing: 12) {
                         PSSectionHeader(title: "Payment methods")
-                        Text("Active gateway: \(gateway == "mpesa" ? "Manual M-PESA" : gateway == "stk" ? "STK push" : gateway). Tap a gateway below, then switch it on.")
+                        Text("Active gateway: \(gatewayLabel(gateway)). Tap a gateway below, then switch it on.")
                             .font(.psCaption)
                             .foregroundStyle(.psMuted)
                         ForEach(methods, id: \.id) { method in
                             let isGateway = method.id != "wallet"
                             let isActive = isGateway && gateway == method.id
                             let isPicked = isGateway && pendingGateway == method.id
-                            let isDisabled = method.id == "stk" && !stkAvailable
+                            let isDisabled = (method.id == "stk" || method.id == "intasend") && !stkAvailable
                             Button {
                                 if isGateway && !isDisabled {
                                     pendingGateway = method.id
@@ -1137,10 +1378,73 @@ struct AdminPaymentMethodsView: View {
                         }
                         Button("Switch gateway") { Task { await switchGateway() } }
                             .psPrimary()
-                            .disabled(isWorking || pendingGateway == gateway || (pendingGateway == "stk" && !stkAvailable))
-                            .accessibilityLabel("Switch gateway to \(pendingGateway)")
+                            .disabled(isWorking || pendingGateway == gateway || ((pendingGateway == "stk" || pendingGateway == "intasend") && !stkAvailable))
+                            .accessibilityLabel("Switch gateway to \(gatewayLabel(pendingGateway))")
                         if pendingGateway != gateway {
-                            Text("Switching to \(pendingGateway == "mpesa" ? "Manual M-PESA" : "STK push") will change how customers pay at checkout.")
+                            Text("Switching to \(gatewayLabel(pendingGateway)) will change how customers pay at checkout.")
+                                .font(.psCaption)
+                                .foregroundStyle(.psMuted)
+                        }
+                    }
+                }
+                PSCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        PSSectionHeader(title: "Manual M-PESA rail")
+                        Text("Active rail: \(railTitle ?? railDisplayName(rail))")
+                            .font(.psHeadline)
+                        if let railBadge, !railBadge.isEmpty {
+                            PSStatusPill(text: railBadge, systemImage: "tag.fill", tint: .psPrimary)
+                        }
+                        if let railInstructions, !railInstructions.isEmpty {
+                            Text(railInstructions)
+                                .font(.psCaption)
+                                .foregroundStyle(.psMuted)
+                        }
+                        ForEach(rails, id: \.id) { railOption in
+                            let isActive = rail == railOption.id
+                            let isPicked = pendingRail == railOption.id
+                            Button {
+                                pendingRail = railOption.id
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "phone.fill")
+                                        .font(.psHeadline)
+                                        .foregroundStyle(isActive ? .psSuccess : .psMuted)
+                                        .frame(width: 24)
+                                        .accessibilityHidden(true)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(railOption.title)
+                                            .font(.psHeadline)
+                                            .foregroundStyle(.psText)
+                                        Text(railOption.detail)
+                                            .font(.psCaption)
+                                            .foregroundStyle(.psMuted)
+                                    }
+                                    Spacer()
+                                    if isActive {
+                                        PSStatusPill(text: "Active", systemImage: "checkmark.circle.fill", tint: .psSuccess)
+                                    } else if isPicked {
+                                        PSStatusPill(text: "Selected", systemImage: "circle.fill", tint: .psPrimary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .padding(12)
+                                .background(isPicked ? Color.psPrimarySoft : Color.psSurface)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isPicked ? Color.psPrimary : Color.psBorder, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(railOption.title), \(isActive ? "active rail" : railOption.detail)")
+                        }
+                        Button("Switch rail") { Task { await switchRail() } }
+                            .psPrimary()
+                            .disabled(isWorking || pendingRail == rail)
+                            .accessibilityLabel("Switch M-PESA rail to \(railDisplayName(pendingRail))")
+                        if pendingRail != rail {
+                            Text("Switching to \(railDisplayName(pendingRail)) will change the M-PESA instructions customers see at checkout.")
                                 .font(.psCaption)
                                 .foregroundStyle(.psMuted)
                         }
@@ -1195,6 +1499,11 @@ struct AdminPaymentMethodsView: View {
             }
             gateway = result.payment_gateway ?? "mpesa"
             pendingGateway = gateway
+            rail = result.payment_method ?? "paybill"
+            pendingRail = rail
+            railTitle = result.rail_title
+            railBadge = result.rail_badge
+            railInstructions = result.rail_instructions
             paybill = result.mpesa_paybill ?? ""
             account = result.mpesa_account ?? ""
             phone = result.mpesa_phone ?? ""
@@ -1245,7 +1554,34 @@ struct AdminPaymentMethodsView: View {
                 method: "POST", body: ["gateway": pendingGateway])
             gateway = result.payment_gateway ?? pendingGateway
             pendingGateway = gateway
-            message = "Gateway is now \(gateway == "mpesa" ? "Manual M-PESA" : "STK push")."
+            message = "Gateway is now \(gatewayLabel(gateway))."
+        } catch {
+            message = error.localizedDescription
+            await load()
+        }
+    }
+
+    private func switchRail() async {
+        // POST /api/v1/admin/payment-methods with
+        // {"payment_method": ...}, which the server validates
+        // against paybill/till/send_money/pochi and saves as the
+        // manual M-PESA rail. Picking a row never posts on its own.
+        struct RailResponse: Decodable {
+            let ok: Bool
+            let payment_gateway: String?
+            let payment_method: String?
+        }
+        guard pendingRail != rail else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            let result: RailResponse = try await APIClient.shared.fetchJSON(
+                "api/v1/admin/payment-methods",
+                method: "POST", body: ["payment_method": pendingRail])
+            rail = result.payment_method ?? pendingRail
+            pendingRail = rail
+            message = "M-PESA rail is now \(railDisplayName(rail))."
+            await load()
         } catch {
             message = error.localizedDescription
             await load()

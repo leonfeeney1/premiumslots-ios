@@ -35,6 +35,7 @@ struct TicketsRootView: View {
     @State private var feedbackMessage = ""
     @State private var feedbackResult: String?
     @State private var isSubmittingFeedback = false
+    @State private var showAuth = false
 
     private let messageTypes = ["Site Feedback", "Suggestion", "General Inquiry", "Payment Issue"]
 
@@ -68,9 +69,15 @@ struct TicketsRootView: View {
 
                 if !appState.isLoggedIn {
                     PSCard {
-                        Text("Sign in to see your tickets and send a message to the team.")
-                            .psTextStyle(.body)
-                            .foregroundStyle(.psMuted)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Sign in to see your tickets and send a message to the team.")
+                                .psTextStyle(.body)
+                                .foregroundStyle(.psMuted)
+                            Button("Sign in") { showAuth = true }
+                                .psPrimary()
+                                .accessibilityLabel("Sign in to use support tickets")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else if isLoading && tickets.isEmpty {
                     PSSkeletonRows(count: 3)
@@ -201,6 +208,10 @@ struct TicketsRootView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .refreshable { await load() }
         .task { await load() }
+        .sheet(isPresented: $showAuth) {
+            AuthView()
+                .psSheetDetents()
+        }
         .onAppear { expandedId = highlightTicketId }
         .safeAreaPadding(.bottom, 8)
     }

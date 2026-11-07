@@ -65,6 +65,29 @@ struct NotificationsRootView: View {
     @State private var loadError: String?
     @State private var actionMessage: String?
     @State private var isMarkingRead = false
+    /// Derived rows (negative ids) have no server row to mark read,
+    /// so a tap remembers them here on this device and the unread
+    /// dot clears. Pruned to listed ids on every reload.
+    @State private var locallyReadIds: Set<Int> = []
+
+    /// A row still counts as unread unless the server says it is
+    /// read or this device already dismissed it with a tap.
+    private func isEffectivelyUnread(_ item: NtfNotification) -> Bool {
+        guard item.isUnread else { return false }
+        guard let id = item.id else { return true }
+        return !locallyReadIds.contains(id)
+    }
+
+    /// Header count: the server figure minus derived rows already
+    /// dismissed on this device, never below zero.
+    private var effectiveUnreadCount: Int {
+        let base = unreadCount ?? notifications.filter(\.isUnread).count
+        let dismissed = notifications.filter { item in
+            guard let id = item.id, id < 0 else { return false }
+            return item.isUnread && locallyReadIds.contains(id)
+        }.count
+        return max(0, base - dismissed)
+    }
 
     var body: some View {
         List {
@@ -73,10 +96,10 @@ struct NotificationsRootView: View {
                     Label("Unread", systemImage: "bell.fill")
                         .font(.psBody)
                     Spacer()
-                    Text("\(unreadCount ?? 0)")
+                    Text("\(effectiveUnreadCount)")
                         .font(.psHeadline)
                         .foregroundStyle(.psCyan)
-                        .accessibilityLabel("\(unreadCount ?? 0) unread notifications")
+                        .accessibilityLabel("\(effectiveUnreadCount) unread notifications")
                 }
                 Button {
                     Task { await markAllRead() }
@@ -117,11 +140,12 @@ struct NotificationsRootView: View {
                 Section("Last 30") {
                     ForEach(notifications) { item in
                         // Every row navigates: tapping marks the
-                        // notification read (queue rows only; derived
-                        // rows have no row to mark and clear when
-                        // the underlying item changes) and posts a
-                        // deep link that ContentView routes to the
-                        // right screen. No dead taps.
+                        // notification read and posts a deep link
+                        // that ContentView routes to the right
+                        // screen. No dead taps. Derived rows have
+                        // no server row to mark, so they clear
+                        // locally on tap and are not counted in
+                        // the unread badge.
                         Button {
                             Task { await open(item) }
                         } label: {
@@ -171,7 +195,7 @@ struct NotificationsRootView: View {
                     Text(item.title ?? item.kind ?? "Notification")
                         .font(.psHeadline)
                         .multilineTextAlignment(.leading)
-                    if item.isUnread {
+                    if isEffectivelyUnread(item) {
                         Circle()
                             .fill(Color.psCyan)
                             .frame(width: 8, height: 8)
@@ -224,16 +248,21 @@ struct NotificationsRootView: View {
     }
 
     /// Mark read (queue rows only) and navigate. Derived rows
-    /// (negative ids) have no NotificationQueue row to mark, so
-    /// the server call is skipped for them and the tap still
-    /// navigates.
+    /// (negative ids) have no NotificationQueue row to mark, so the
+    /// tap is remembered on this device instead: the dot clears and
+    /// the row stops counting as unread, even though the server
+    /// still lists it as unread until the underlying item changes.
     private func open(_ item: NtfNotification) async {
-        if item.isUnread, let id = item.id, id > 0 {
-            do {
-                let _: APIResponse = try await APIClient.shared.fetchOK(
-                    "api/v1/me/notifications/read", method: "POST", body: ["ids": [id]])
-            } catch {
-                // A failed mark-read must not block navigation.
+        if item.isUnread, let id = item.id {
+            if id < 0 {
+                locallyReadIds.insert(id)
+            } else {
+                do {
+                    let _: APIResponse = try await APIClient.shared.fetchOK(
+                        "api/v1/me/notifications/read", method: "POST", body: ["ids": [id]])
+                } catch {
+                    // A failed mark-read must not block navigation.
+                }
             }
         }
         PSDeepLinkRouter.post(
@@ -252,6 +281,8 @@ struct NotificationsRootView: View {
             // The server returns unread_count null when the table has
             // no read flag. Count from the list instead of showing 0.
             unreadCount = response.unread_count ?? response.notifications.filter(\.isUnread).count
+            // Drop locally dismissed ids that are no longer listed.
+            locallyReadIds.formIntersection(Set(response.notifications.compactMap(\.id)))
         } catch {
             loadError = error.localizedDescription
         }
@@ -263,6 +294,9 @@ struct NotificationsRootView: View {
         do {
             let _: APIResponse = try await APIClient.shared.fetchOK(
                 "api/v1/me/notifications/read", method: "POST", body: [:])
+            // Derived rows are not marked by the server call, so
+            // dismiss them locally too or their dots never clear.
+            locallyReadIds.formUnion(notifications.filter { ($0.id ?? 0) < 0 && $0.isUnread }.compactMap(\.id))
             actionMessage = "All notifications marked as read."
             await load()
         } catch {

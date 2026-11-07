@@ -60,6 +60,7 @@ struct MySlotsView: View {
     @State private var togglingIds: Set<Int> = []
     @State private var requestingReviewIds: Set<Int> = []
     @State private var pendingDisableSub: LiveSubscription?
+    @State private var deepLinkMessage: String?
 
     /// Live list when present, otherwise the last good cached list.
     /// The cached list is only ever shown while signed in.
@@ -82,6 +83,18 @@ struct MySlotsView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let deepLinkMessage {
+                    Section {
+                        HStack(spacing: 10) {
+                            PSRingSpinner(diameter: 20, lineWidth: 2, duration: 0.7)
+                            Text(deepLinkMessage)
+                                .font(.psBody)
+                                .foregroundStyle(.psMuted)
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
                 if !appState.isLoggedIn {
                     loginGate
                         .listRowBackground(Color.clear)
@@ -295,7 +308,21 @@ struct MySlotsView: View {
 
     private func openDeepLink(id: Int?) {
         guard let id else { return }
-        guard let sub = displaySubs.first(where: { $0.id == id }) else { return }
+        guard let sub = displaySubs.first(where: { $0.id == id }) else {
+            // The subscription is not on screen yet (still loading,
+            // or the id no longer exists): say so instead of doing
+            // nothing. The message clears when the slot opens, or
+            // after a few seconds if it never appears.
+            deepLinkMessage = "Opening…"
+            Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if deepLinkSubscriptionId.wrappedValue == id {
+                    deepLinkMessage = nil
+                }
+            }
+            return
+        }
+        deepLinkMessage = nil
         selectedSubscription = sub
         deepLinkSubscriptionId.wrappedValue = nil
     }
@@ -512,24 +539,29 @@ struct MySlotsView: View {
         }
     }
 
-    /// Auto-renew toggle on the card, for Active slots only. Shown
-    /// only when the server reported the current state; turning it
-    /// off asks for confirmation with a destructive button.
+    /// Auto-renew toggle on the card, for Active slots only. The row
+    /// always renders: when the server has not reported a value yet
+    /// the switch shows off with a "Not set yet" hint instead of
+    /// vanishing with no explanation. Turning it off asks for
+    /// confirmation with a destructive button.
     @ViewBuilder
     private func autoRenewRow(for sub: LiveSubscription) -> some View {
-        if let renew = autoRenew(for: sub) {
-            HStack {
-                Label("Auto-renew", systemImage: "arrow.triangle.2.circlepath")
-                    .psTextStyle(.body)
-                Spacer()
-                if togglingIds.contains(sub.id) {
-                    PSRingSpinner(diameter: 20, lineWidth: 2, duration: 0.7)
-                } else {
-                    Toggle("", isOn: autoRenewCardBinding(for: sub, current: renew))
-                        .labelsHidden()
-                        .accessibilityLabel("Auto-renew for \(sub.serviceRequested), currently \(renew ? "on" : "off")")
-                }
+        HStack {
+            Label("Auto-renew", systemImage: "arrow.triangle.2.circlepath")
+                .psTextStyle(.body)
+            Spacer()
+            if togglingIds.contains(sub.id) {
+                PSRingSpinner(diameter: 20, lineWidth: 2, duration: 0.7)
+            } else {
+                Toggle("", isOn: autoRenewCardBinding(for: sub, current: autoRenew(for: sub) ?? false))
+                    .labelsHidden()
+                    .accessibilityLabel("Auto-renew for \(sub.serviceRequested), currently \(autoRenew(for: sub) == true ? "on" : "off")")
             }
+        }
+        if autoRenew(for: sub) == nil {
+            Text("Not set yet. Tap to enable.")
+                .psTextStyle(.caption)
+                .foregroundStyle(.psMuted)
         }
     }
 
@@ -924,19 +956,16 @@ struct SubscriptionDetailSheet: View {
                     }
                 }
                 Section("Auto-renew") {
-                    if autoRenewState != nil {
-                        Toggle("Auto-renew", isOn: autoRenewBinding)
-                            .disabled(isTogglingAutoRenew)
-                        Text("When auto-renew is on, your slot renews on the renewal date. When it is off, the slot ends on that date.")
-                            .psTextStyle(.caption)
-                            .foregroundStyle(.psMuted)
-                    } else {
-                        Text("Not available yet")
-                            .foregroundStyle(.psMuted)
-                        Text("The server does not report auto-renew for this slot yet.")
+                    Toggle("Auto-renew", isOn: autoRenewBinding)
+                        .disabled(isTogglingAutoRenew)
+                    if autoRenewState == nil {
+                        Text("Not set yet. Tap to enable.")
                             .psTextStyle(.caption)
                             .foregroundStyle(.psMuted)
                     }
+                    Text("When auto-renew is on, your slot renews on the renewal date. When it is off, the slot ends on that date.")
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
                     if let autoRenewMessage {
                         Text(autoRenewMessage)
                             .psTextStyle(.caption)

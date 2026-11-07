@@ -33,6 +33,7 @@ struct WishlistRootView: View {
     @State private var submitCategory = "AI Tools"
     @State private var submitPrice = ""
     @State private var isSubmitting = false
+    @State private var showAuth = false
 
     // Server categories when the list response carries them; the
     // hardcoded list is the fallback only. Statuses include
@@ -71,6 +72,9 @@ struct WishlistRootView: View {
                     Text("Sign in to see the wishlist, vote and suggest new platforms.")
                         .font(.psBody)
                         .foregroundStyle(.psMuted)
+                    Button("Sign in") { showAuth = true }
+                        .psPrimary()
+                        .accessibilityLabel("Sign in to use the wishlist")
                 }
             }
 
@@ -117,13 +121,25 @@ struct WishlistRootView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
             } else if items.isEmpty {
-                PSEmptyState(
-                    systemImage: "star",
-                    title: "Nothing on the wishlist",
-                    body: "Try a different filter or search, or suggest a platform below."
-                )
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                if !appState.isLoggedIn {
+                    PSEmptyState(
+                        systemImage: "star",
+                        title: "Sign in to see the wishlist",
+                        body: "The wishlist, votes and suggestions live on your PremiumSlots account.",
+                        actionLabel: "Sign in",
+                        action: { showAuth = true }
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } else {
+                    PSEmptyState(
+                        systemImage: "star",
+                        title: "Nothing on the wishlist",
+                        body: "Try a different filter or search, or suggest a platform below."
+                    )
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
             } else {
                 Section("Wishlist") {
                     ForEach(items) { item in
@@ -254,6 +270,10 @@ struct WishlistRootView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
+        .sheet(isPresented: $showAuth) {
+            AuthView()
+                .psSheetDetents()
+        }
         .safeAreaPadding(.bottom, 8)
     }
 
@@ -292,7 +312,13 @@ struct WishlistRootView: View {
         defer { isLoading = false }
         var params: [(String, String)] = []
         if selectedCategory != "All" { params.append(("category", selectedCategory)) }
-        if selectedStatus != "all" { params.append(("status", selectedStatus)) }
+        // "Suggested" is a display label only: the server files new
+        // suggestions as under_review, and no row ever carries the
+        // status "suggested", so sending it matched nothing and the
+        // filter always came back empty. Send under_review instead.
+        if selectedStatus != "all" {
+            params.append(("status", selectedStatus == "suggested" ? "under_review" : selectedStatus))
+        }
         params.append(("sort", selectedSort))
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty { params.append(("q", q)) }
