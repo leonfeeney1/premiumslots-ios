@@ -132,13 +132,8 @@ struct GiftCardsRootView: View {
         NavigationStack {
             Group {
                 if isLoading, data == nil {
-                    VStack(spacing: 16) {
-                        PSRingSpinner()
-                        Text("Loading gift cards")
-                            .font(.psBody)
-                            .foregroundStyle(.psMuted)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    PSSkeletonRows(count: 3)
+                        .psScreenPadding()
                 } else if let errorMessage, data == nil {
                     PSErrorState(message: errorMessage) {
                         Task { await load() }
@@ -157,7 +152,7 @@ struct GiftCardsRootView: View {
                     giftCardList
                 }
             }
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("Gift cards")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -185,76 +180,116 @@ struct GiftCardsRootView: View {
         }
     }
 
+    // One coherent design system for the whole page: a hero card,
+    // one primary action row, denominations as chips, themes as
+    // visual swatches, and issued / redeemed cards that all share
+    // the same card, header and spacing rules as the rest of the
+    // app (PSCard, PSSectionHeader, 16pt screen padding, 12pt
+    // spacing, PSTextStyle type only).
     private var giftCardList: some View {
-        List {
-            Section {
-                Button("Send a gift card") { showCreate = true }
-                    .psPrimary()
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .accessibilityLabel("Send a gift card")
-                Button("Verify a code") { showVerify = true }
-                    .buttonStyle(.bordered)
-                    .tint(.psCyan)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .accessibilityLabel("Verify a gift card code")
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                PSCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "gift.fill")
+                                .font(.psIcon)
+                                .foregroundStyle(.psCyan)
+                                .accessibilityHidden(true)
+                            Text("Send a gift, share a slot")
+                                .psTextStyle(.title)
+                        }
+                        Text("A gift card is wallet credit for someone else: they redeem the code into their wallet and use it on any platform.")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psMuted)
+                        HStack(spacing: 10) {
+                            Button("Send a gift card") { showCreate = true }
+                                .psPrimary()
+                            Button("Verify a code") { showVerify = true }
+                                .buttonStyle(.bordered)
+                                .tint(.psCyan)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            Section("Denominations") {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(denominations, id: \.self) { amount in
-                            Text(psKES(amount))
-                                .font(.psMono)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.psSurface)
-                                .clipShape(Capsule())
-                                .overlay(Capsule().stroke(Color.psBorder, lineWidth: 1))
+                VStack(alignment: .leading, spacing: 12) {
+                    PSSectionHeader(title: "Denominations")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(denominations, id: \.self) { amount in
+                                Text(psKES(amount))
+                                    .font(.psMono)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.psSurface)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.psBorder, lineWidth: 1))
+                            }
+                        }
+                    }
+                    Text("Gift cards come in these amounts, paid with M-PESA.")
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    PSSectionHeader(title: "Themes")
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        ForEach(PSGiftCardTheme.all) { theme in
+                            VStack(alignment: .leading, spacing: 8) {
+                                LinearGradient(colors: theme.colors, startPoint: .leading, endPoint: .trailing)
+                                    .frame(height: 44)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .accessibilityHidden(true)
+                                Text(theme.name)
+                                    .font(.psBody)
+                            }
+                            .padding(10)
+                            .background(Color.psSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.psBorder, lineWidth: 1)
+                            )
+                            .accessibilityLabel("Gift card theme \(theme.name)")
                         }
                     }
                 }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-            }
 
-            Section("Themes") {
-                ForEach(PSGiftCardTheme.all) { theme in
-                    GiftCardThemeRow(theme: theme)
+                VStack(alignment: .leading, spacing: 12) {
+                    PSSectionHeader(title: "My issued cards")
+                    if issued.isEmpty {
+                        PSEmptyState(
+                            systemImage: "gift",
+                            title: "No gift cards sent yet",
+                            body: "Gift cards you send will show here with their code, amount and status."
+                        )
+                    } else {
+                        ForEach(issued, id: \.id) { card in
+                            GiftCardRow(card: card)
+                        }
+                    }
                 }
-            }
 
-            Section("My issued cards") {
-                if issued.isEmpty {
-                    PSEmptyState(
-                        systemImage: "gift",
-                        title: "No gift cards sent yet",
-                        body: "Gift cards you send will show here with their code, amount and status."
-                    )
-                } else {
-                    ForEach(issued, id: \.id) { card in
-                        GiftCardRow(card: card)
+                VStack(alignment: .leading, spacing: 12) {
+                    PSSectionHeader(title: "My redeemed cards")
+                    if redeemed.isEmpty {
+                        PSEmptyState(
+                            systemImage: "checkmark.circle",
+                            title: "No gift cards redeemed yet",
+                            body: "Gift cards you redeem into your wallet will show here."
+                        )
+                    } else {
+                        ForEach(redeemed, id: \.id) { card in
+                            GiftCardRow(card: card)
+                        }
                     }
                 }
             }
-
-            Section("My redeemed cards") {
-                if redeemed.isEmpty {
-                    PSEmptyState(
-                        systemImage: "checkmark.circle",
-                        title: "No gift cards redeemed yet",
-                        body: "Gift cards you redeem into your wallet will show here."
-                    )
-                } else {
-                    ForEach(redeemed, id: \.id) { card in
-                        GiftCardRow(card: card)
-                    }
-                }
-            }
+            .psScreenPadding()
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .psHiddenScrollIndicators()
         .refreshable { await load() }
     }
 
@@ -299,70 +334,67 @@ struct GiftCardRow: View {
     let card: PSGiftCard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        PSCard {
+            VStack(alignment: .leading, spacing: 10) {
                 if let theme = PSGiftCardTheme.theme(named: card.theme_style) {
                     LinearGradient(colors: theme.colors, startPoint: .leading, endPoint: .trailing)
-                        .frame(width: 36, height: 24)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .accessibilityHidden(true)
-                } else {
-                    Image(systemName: "gift.fill")
-                        .font(.psIcon)
-                        .foregroundStyle(.psMuted)
+                        .frame(height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .accessibilityHidden(true)
                 }
-                Text(psKES(card.amount))
-                    .font(.psHeadline)
-                Spacer()
-                if let status = card.status, !status.isEmpty {
-                    PSStatusPill(
-                        text: psCapitalized(status),
-                        systemImage: status.lowercased() == "active" ? "checkmark.circle.fill" : "circle.fill",
-                        tint: status.lowercased() == "active" ? .psSuccess : .psMuted
-                    )
-                }
-            }
-            if let code = card.code, !code.isEmpty {
                 HStack {
-                    Text(code)
-                        .font(.psMono)
-                    Button {
-                        UIPasteboard.general.string = code
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.psIcon)
+                    Text(psKES(card.amount))
+                        .font(.psTitle)
+                    Spacer()
+                    if let status = card.status, !status.isEmpty {
+                        PSStatusPill(
+                            text: psCapitalized(status),
+                            systemImage: status.lowercased() == "active" ? "checkmark.circle.fill" : "circle.fill",
+                            tint: status.lowercased() == "active" ? .psSuccess : .psMuted
+                        )
                     }
-                    .accessibilityLabel("Copy gift card code \(code)")
                 }
+                if let code = card.code, !code.isEmpty {
+                    HStack {
+                        Text(code)
+                            .font(.psMono)
+                        Button {
+                            UIPasteboard.general.string = code
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.psIcon)
+                        }
+                        .accessibilityLabel("Copy gift card code \(code)")
+                    }
+                }
+                HStack(spacing: 8) {
+                    if let name = card.recipient_name ?? card.recipient_email, !name.isEmpty {
+                        Text("To \(name)")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    if let themeName = card.theme_style, !themeName.isEmpty {
+                        Text(themeName)
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    if let expiry = card.expiryText {
+                        Text("Expires \(psShortDate(expiry))")
+                            .font(.psCaption)
+                            .foregroundStyle(.psMuted)
+                    }
+                }
+                if let message = card.message, !message.isEmpty {
+                    Text(message)
+                        .font(.psBody)
+                        .foregroundStyle(.psDim)
+                }
+                Text("Sent \(psShortDate(card.created_at))")
+                    .font(.psCaption)
+                    .foregroundStyle(.psMuted)
             }
-            HStack(spacing: 8) {
-                if let name = card.recipient_name ?? card.recipient_email, !name.isEmpty {
-                    Text("To \(name)")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                }
-                if let themeName = card.theme_style, !themeName.isEmpty {
-                    Text(themeName)
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                }
-                if let expiry = card.expiryText {
-                    Text("Expires \(psShortDate(expiry))")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                }
-            }
-            if let message = card.message, !message.isEmpty {
-                Text(message)
-                    .font(.psBody)
-                    .foregroundStyle(.psDim)
-            }
-            Text("Sent \(psShortDate(card.created_at))")
-                .font(.psCaption)
-                .foregroundStyle(.psMuted)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .psTouchTarget()
     }
 }
 
@@ -508,7 +540,7 @@ struct GiftCardCreateSheet: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("Send a gift card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -653,7 +685,7 @@ struct GiftCardVerifyView: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("Verify a gift card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

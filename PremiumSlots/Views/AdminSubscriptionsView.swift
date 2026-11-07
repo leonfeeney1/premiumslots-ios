@@ -85,6 +85,12 @@ struct AdminRenewResponse: Decodable {
 }
 
 struct AdminSubscriptionsRootView: View {
+    /// Deep link from an admin notification: when set, the matching
+    /// subscription detail sheet opens automatically once the list
+    /// loads, so a tap on a new-subscription notification lands on
+    /// that order instead of the bare list.
+    var preselectedSubscriptionId: Int? = nil
+
     @EnvironmentObject private var appState: AppState
     @State private var subscriptions: [AdminSubscriptionRow] = []
     @State private var searchText = ""
@@ -124,23 +130,22 @@ struct AdminSubscriptionsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && subscriptions.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading subscriptions")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    AdminSkeletonView(lines: 5, title: "Loading subscriptions")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let errorMessage, subscriptions.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Subscriptions")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -290,18 +295,49 @@ struct AdminSubscriptionsRootView: View {
 
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        // Cache first: show the last saved list immediately, then
+        // refresh live.
+        if let cached = AdminCache.load(key: "admin-subscriptions"),
+           let decoded = try? JSONDecoder().decode(AdminSubscriptionsListResponse.self, from: cached),
+           decoded.ok {
+            subscriptions = decoded.subscriptions ?? []
+            openPreselected()
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let result: AdminSubscriptionsListResponse = try await APIClient.shared.fetchJSON("api/v1/admin/subscriptions")
+            let data = try await APIClient.shared.fetchData("api/v1/admin/subscriptions")
+            let result = try JSONDecoder().decode(AdminSubscriptionsListResponse.self, from: data)
             guard result.ok else {
-                errorMessage = "Admin needs the live API. The subscriptions endpoint did not return data."
+                if subscriptions.isEmpty {
+                    errorMessage = "Admin needs the live API. The subscriptions endpoint did not return data."
+                }
                 return
             }
+            AdminCache.save(data, key: "admin-subscriptions")
             subscriptions = result.subscriptions ?? []
+            openPreselected()
         } catch {
-            errorMessage = error.localizedDescription
+            if subscriptions.isEmpty {
+                errorMessage = error.localizedDescription
+            } else {
+                actionMessage = "Live refresh failed: \(error.localizedDescription). Showing the last saved list."
+            }
+        }
+    }
+
+    /// Opens the deep-linked subscription detail once its row is
+    /// in the list. Runs after both the cached and the live load,
+    /// but only once, so a later refresh does not reopen the sheet
+    /// after the admin closed it.
+    @State private var didOpenPreselected = false
+
+    private func openPreselected() {
+        guard !didOpenPreselected, let target = preselectedSubscriptionId, selected == nil else { return }
+        if let match = subscriptions.first(where: { $0.id == target }) {
+            didOpenPreselected = true
+            selected = match
         }
     }
 
@@ -487,7 +523,7 @@ struct AdminSubscriptionDetailSheet: View {
                 .psScreenPadding()
             }
             .scrollIndicators(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Order #\(subscription.id)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

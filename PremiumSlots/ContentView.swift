@@ -1,12 +1,21 @@
 import SwiftUI
 
-// MARK: - ContentView, v4
+// MARK: - ContentView, v4 (v6 deep links)
 // New tab bar: Home, Catalogue, My Slots, Wallet, Settings.
 // How it works lives inside Home (and Help); Admin lives in Settings
 // (Admin dashboard / Admin sign-in) and is NOT on the tab bar.
 // Every tab root sits in its own NavigationStack, so swipe-back works
 // natively on every push, and every sheet has a dismiss control.
 // Swiping left/right on the tab content moves between tabs.
+//
+// Deep links (v6): NotificationsRootView posts a PSDeepLink when a
+// notification is tapped. This view is the only place that owns the
+// tab bar, so it handles the routing: tab destinations switch tabs
+// (a subscription id is handed to MySlotsView, which opens the
+// detail sheet for that subscription once it is loaded), and
+// destinations with no tab (tickets, dashboard, gift cards, help,
+// wishlist) are presented as sheets over the tabs. No tap lands
+// nowhere: an unknown link falls back to Home.
 
 enum PSTab: String, CaseIterable {
     case home, catalogue, mySlots, wallet, settings
@@ -35,6 +44,8 @@ enum PSTab: String, CaseIterable {
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedTab: PSTab = .home
+    @State private var deepLinkSubscriptionId: Int?
+    @State private var presentedLink: PSDeepLink?
 
     var body: some View {
         // Safe area: the TabView and every tab root NavigationStack
@@ -45,10 +56,13 @@ struct ContentView: View {
         // or in HomeView and MySlotsView; the only ignoresSafeArea
         // in the owned files is the full-screen loader background
         // in PSLoaderView, whose content is centred and never sits
-        // under the notch.
+        // under the notch. The background colour extends under the
+        // tab bar and the home indicator through psScreenBackground
+        // on each tab root, so the app is full screen edge to edge.
         TabView(selection: $selectedTab) {
             HomeView(
                 onBrowseCatalogue: { selectedTab = .catalogue },
+                onOpenMySlots: { selectedTab = .mySlots },
                 onOpenSupport: { selectedTab = .settings }
             )
             .tabItem { Label(PSTab.home.title, systemImage: PSTab.home.systemImage) }
@@ -59,7 +73,8 @@ struct ContentView: View {
             .tag(PSTab.catalogue)
 
             MySlotsView(
-                onBrowseCatalogue: { selectedTab = .catalogue }
+                onBrowseCatalogue: { selectedTab = .catalogue },
+                deepLinkSubscriptionId: $deepLinkSubscriptionId
             )
             .tabItem { Label(PSTab.mySlots.title, systemImage: PSTab.mySlots.systemImage) }
             .tag(PSTab.mySlots)
@@ -96,6 +111,57 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $appState.needsOnboarding) {
             OnboardingView()
                 .environmentObject(appState)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .psDeepLink)) { note in
+            guard let link = note.object as? PSDeepLink else { return }
+            handleDeepLink(link)
+        }
+        .sheet(item: $presentedLink) { link in
+            deepLinkSheet(link)
+        }
+    }
+
+    private func handleDeepLink(_ link: PSDeepLink) {
+        switch link {
+        case .subscription(let subId):
+            deepLinkSubscriptionId = subId
+            selectedTab = .mySlots
+        case .mySlots:
+            selectedTab = .mySlots
+        case .wallet:
+            selectedTab = .wallet
+        case .catalogue:
+            selectedTab = .catalogue
+        case .home:
+            selectedTab = .home
+        case .ticket, .dashboard, .giftCards, .help, .wishlist:
+            presentedLink = link
+        }
+    }
+
+    @ViewBuilder
+    private func deepLinkSheet(_ link: PSDeepLink) -> some View {
+        switch link {
+        case .ticket(let ticketId):
+            NavigationStack {
+                TicketsRootView(highlightTicketId: ticketId)
+            }
+        case .dashboard:
+            NavigationStack {
+                DashboardRootView()
+            }
+        case .giftCards:
+            GiftCardsRootView()
+        case .help:
+            NavigationStack {
+                HelpRootView()
+            }
+        case .wishlist:
+            NavigationStack {
+                WishlistRootView()
+            }
+        default:
+            EmptyView()
         }
     }
 }

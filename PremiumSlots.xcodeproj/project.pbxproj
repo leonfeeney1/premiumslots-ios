@@ -8,96 +8,102 @@
 
 /* Begin PBXBuildFile section */
 		057C57A1722243C8B567470E /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496040DDAF4440EE9D82EF57 /* AdminView.swift */; };
+		0A36CE3204E315CD688C4020 /* TermsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFED49240A41FE02F54F16FA /* TermsView.swift */; };
+		1EA10E072992285B8520DD66 /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */; };
+		234A7BC62A1A1BC447CFFD29 /* HelpBlogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */; };
 		28BB04C99D3C4918F70E3E17 /* CheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE7CDE0689036A536E1EABF /* CheckoutView.swift */; };
 		2F330915458AD97AC877CEB5 /* PlatformDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */; };
+		301A4F8EA22067FE40F411FC /* AdminDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C2F4932929429BFD28B0EFF /* AdminDesign.swift */; };
 		33978E4FDFBE6A760B2143B9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6D196DA7F0108A072F670C /* SettingsView.swift */; };
 		3DD78CD055CEA604C926BE9C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9D3E379DD97D2A4D79A984 /* Models.swift */; };
 		3E31102351BD559C5EC3C189 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDDEF57AF2A6A4373FEF648 /* Theme.swift */; };
+		3F2147FD403A0EDDEDBF75C5 /* PasskeyAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */; };
+		40D1D9C905AD46A4B0B06056 /* LegalText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F75C5127AD8F2792C6B8B /* LegalText.swift */; };
 		4C36E43667314852A7FC145B /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */; };
+		501069FED5077A07513B2641 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92FDBC20E2D2E772D937D9F /* WalletView.swift */; };
+		50CADFCD297F6AD58BC5BA1D /* PlatformLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58995646BA3CE9BC844C374E /* PlatformLogoView.swift */; };
+		5633031D0BCEA1AF6571D62E /* AdminAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */; };
 		585DA461E1DE3AB5136612BE /* PremiumSlotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */; };
+		62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */; };
 		641ABDE62A4D4739A72F9D66 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF79CC3339F4563AC746480 /* APIClient.swift */; };
+		688C8EBF51AD990D26E3ED69 /* AdminNotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D135712A4628490D6E8573C7 /* AdminNotificationsView.swift */; };
+		6E1F46CD89396605FAE557DD /* PSDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726C44708F41014D3633FC92 /* PSDeepLink.swift */; };
+		7147DCD5018AFE48CA788A5B /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */; };
 		75A0402796CD4B4DB0F0ADE9 /* ClerkAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A734071BEEA2C8553297D3E /* ClerkAuthView.swift */; };
 		79766E173C8478083C910B49 /* HowItWorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A4590BAAB972163A79AF15 /* HowItWorksView.swift */; };
 		7E4D4BF48F82FCFA7EA9A3E3 /* PSLoaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4C48E6B8176FCE11916EB1 /* PSLoaderView.swift */; };
 		82ABD478584A2982A46F8563 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */; };
+		87AAFCC218DF094361847E91 /* PSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0884EDC3060599DEC03F9E1A /* PSComponents.swift */; };
+		8D414D64ABC047FABD50AEE4 /* PSSkeleton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456041C2BAF9EAA2906324B8 /* PSSkeleton.swift */; };
+		9520A251C6AC91093E947B90 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5FDA693631CA23509170A6 /* HomeView.swift */; };
+		9A4C307CD388017FF4551BBE /* StoreLoyaltyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */; };
+		9BDE442272BE9C96DDAF7B42 /* AdminCustomersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */; };
+		A43D0024179D3C7BA420B267 /* APIClient+Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */; };
+		AA24513294E657975A490EA0 /* GiftCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */; };
+		ADECEC1C624DEBBAD7532617 /* ReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86067DB7752941A2B1F87F1C /* ReceiptsView.swift */; };
+		B21E2AF4E226C5A95663D910 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9F4E969F818858E1E645CD /* AccountView.swift */; };
 		B8999ECE27D297F020299F66 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4087EC7559401B3F62CABF /* ContentView.swift */; };
+		C294D08B62A91CA8350BD93E /* AdminSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */; };
+		D02CC667343D5CA22F2D0599 /* KeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8716CD886A4B45FB357F3D4C /* KeyboardDismiss.swift */; };
 		D02FB7E024D5CB145E909189 /* MySlotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3888DBE22CE412ACB94000D2 /* MySlotsView.swift */; };
 		D57DDEE24B65FA9766C5894F /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D62D1347F6783D1323CE4D2 /* CatalogView.swift */; };
 		D6CA38FAE212EDA9213A31FC /* SlotCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */; };
-		87AAFCC218DF094361847E91 /* PSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0884EDC3060599DEC03F9E1A /* PSComponents.swift */; };
-		501069FED5077A07513B2641 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92FDBC20E2D2E772D937D9F /* WalletView.swift */; };
-		AA24513294E657975A490EA0 /* GiftCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */; };
-		9A4C307CD388017FF4551BBE /* StoreLoyaltyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */; };
-		7147DCD5018AFE48CA788A5B /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */; };
-		234A7BC62A1A1BC447CFFD29 /* HelpBlogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */; };
 		E4B41576A3CEBBE9FAC96804 /* TicketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9A8F0174192BC9816302DF /* TicketsView.swift */; };
-		B21E2AF4E226C5A95663D910 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9F4E969F818858E1E645CD /* AccountView.swift */; };
-		FAD686B6207D12B4AD1A315D /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30263CDB52B46A782DB34705 /* NotificationsView.swift */; };
-		FDCA21CB70CF655926E1FAEE /* WishlistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */; };
-		5633031D0BCEA1AF6571D62E /* AdminAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */; };
-		C294D08B62A91CA8350BD93E /* AdminSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */; };
-		688C8EBF51AD990D26E3ED69 /* AdminNotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D135712A4628490D6E8573C7 /* AdminNotificationsView.swift */; };
-		D02CC667343D5CA22F2D0599 /* KeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8716CD886A4B45FB357F3D4C /* KeyboardDismiss.swift */; };
-		50CADFCD297F6AD58BC5BA1D /* PlatformLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58995646BA3CE9BC844C374E /* PlatformLogoView.swift */; };
-		9520A251C6AC91093E947B90 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB5FDA693631CA23509170A6 /* HomeView.swift */; };
-		9BDE442272BE9C96DDAF7B42 /* AdminCustomersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */; };
-		62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */; };
 		EE0541BF578CCEB51672A0FA /* AdminContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B2C0990C651323460B5961E /* AdminContentView.swift */; };
 		FAB3783C6A63D77628832317 /* AdminOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */; };
-		A43D0024179D3C7BA420B267 /* APIClient+Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */; };
-		40D1D9C905AD46A4B0B06056 /* LegalText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832F75C5127AD8F2792C6B8B /* LegalText.swift */; };
-		1EA10E072992285B8520DD66 /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */; };
-		0A36CE3204E315CD688C4020 /* TermsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFED49240A41FE02F54F16FA /* TermsView.swift */; };
-		3F2147FD403A0EDDEDBF75C5 /* PasskeyAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */; };
-		ADECEC1C624DEBBAD7532617 /* ReceiptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86067DB7752941A2B1F87F1C /* ReceiptsView.swift */; };
+		FAD686B6207D12B4AD1A315D /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30263CDB52B46A782DB34705 /* NotificationsView.swift */; };
+		FDCA21CB70CF655926E1FAEE /* WishlistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		02A4590BAAB972163A79AF15 /* HowItWorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowItWorksView.swift; sourceTree = "<group>"; };
-		0F6D196DA7F0108A072F670C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotCard.swift; sourceTree = "<group>"; };
 		0884EDC3060599DEC03F9E1A /* PSComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSComponents.swift; sourceTree = "<group>"; };
-		C92FDBC20E2D2E772D937D9F /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
-		89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardsView.swift; sourceTree = "<group>"; };
-		A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreLoyaltyView.swift; sourceTree = "<group>"; };
-		A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpBlogView.swift; sourceTree = "<group>"; };
-		7C9A8F0174192BC9816302DF /* TicketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketsView.swift; sourceTree = "<group>"; };
-		2E9F4E969F818858E1E645CD /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
-		30263CDB52B46A782DB34705 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
-		5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistView.swift; sourceTree = "<group>"; };
 		0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAnalyticsView.swift; sourceTree = "<group>"; };
-		AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSubscriptionsView.swift; sourceTree = "<group>"; };
-		D135712A4628490D6E8573C7 /* AdminNotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNotificationsView.swift; sourceTree = "<group>"; };
-		8716CD886A4B45FB357F3D4C /* KeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardDismiss.swift; sourceTree = "<group>"; };
-		58995646BA3CE9BC844C374E /* PlatformLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformLogoView.swift; sourceTree = "<group>"; };
-		FB5FDA693631CA23509170A6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminCustomersView.swift; sourceTree = "<group>"; };
-		7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminWalletView.swift; sourceTree = "<group>"; };
-		6B2C0990C651323460B5961E /* AdminContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminContentView.swift; sourceTree = "<group>"; };
+		0C2F4932929429BFD28B0EFF /* AdminDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminDesign.swift; sourceTree = "<group>"; };
+		0F6D196DA7F0108A072F670C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsView.swift; sourceTree = "<group>"; };
-		8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Home.swift"; sourceTree = "<group>"; };
-		832F75C5127AD8F2792C6B8B /* LegalText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalText.swift; sourceTree = "<group>"; };
-		F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
-		FFED49240A41FE02F54F16FA /* TermsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsView.swift; sourceTree = "<group>"; };
-		A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyAuth.swift; sourceTree = "<group>"; };
-		86067DB7752941A2B1F87F1C /* ReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptsView.swift; sourceTree = "<group>"; };
+		152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotCard.swift; sourceTree = "<group>"; };
 		2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailView.swift; sourceTree = "<group>"; };
 		2D62D1347F6783D1323CE4D2 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
+		2E9F4E969F818858E1E645CD /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		30263CDB52B46A782DB34705 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		3888DBE22CE412ACB94000D2 /* MySlotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MySlotsView.swift; sourceTree = "<group>"; };
 		3A734071BEEA2C8553297D3E /* ClerkAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkAuthView.swift; sourceTree = "<group>"; };
 		3DF79CC3339F4563AC746480 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		3FE7CDE0689036A536E1EABF /* CheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutView.swift; sourceTree = "<group>"; };
+		456041C2BAF9EAA2906324B8 /* PSSkeleton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSSkeleton.swift; sourceTree = "<group>"; };
 		496040DDAF4440EE9D82EF57 /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
 		4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		58995646BA3CE9BC844C374E /* PlatformLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformLogoView.swift; sourceTree = "<group>"; };
+		5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistView.swift; sourceTree = "<group>"; };
+		6B2C0990C651323460B5961E /* AdminContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminContentView.swift; sourceTree = "<group>"; };
+		726C44708F41014D3633FC92 /* PSDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSDeepLink.swift; sourceTree = "<group>"; };
 		7B4C48E6B8176FCE11916EB1 /* PSLoaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSLoaderView.swift; sourceTree = "<group>"; };
+		7C9A8F0174192BC9816302DF /* TicketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketsView.swift; sourceTree = "<group>"; };
+		7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminWalletView.swift; sourceTree = "<group>"; };
+		832F75C5127AD8F2792C6B8B /* LegalText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalText.swift; sourceTree = "<group>"; };
+		86067DB7752941A2B1F87F1C /* ReceiptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptsView.swift; sourceTree = "<group>"; };
+		8716CD886A4B45FB357F3D4C /* KeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardDismiss.swift; sourceTree = "<group>"; };
+		89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardsView.swift; sourceTree = "<group>"; };
 		8A38EFDB4820E459F186A381 /* PremiumSlots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PremiumSlots.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EA06AA99ED17051385DAC87 /* APIClient+Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "APIClient+Home.swift"; sourceTree = "<group>"; };
 		8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C4087EC7559401B3F62CABF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreLoyaltyView.swift; sourceTree = "<group>"; };
+		A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasskeyAuth.swift; sourceTree = "<group>"; };
+		AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSubscriptionsView.swift; sourceTree = "<group>"; };
+		C92FDBC20E2D2E772D937D9F /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
 		CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumSlotsApp.swift; sourceTree = "<group>"; };
+		D135712A4628490D6E8573C7 /* AdminNotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminNotificationsView.swift; sourceTree = "<group>"; };
 		DE9D3E379DD97D2A4D79A984 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpBlogView.swift; sourceTree = "<group>"; };
 		E66913BB80E2651A821BA7B5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminCustomersView.swift; sourceTree = "<group>"; };
+		F90F1ECFF191357B69EF9FFB /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
+		FB5FDA693631CA23509170A6 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		FCDDEF57AF2A6A4373FEF648 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		FFED49240A41FE02F54F16FA /* TermsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TermsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,6 +157,9 @@
 				FFED49240A41FE02F54F16FA /* TermsView.swift */,
 				A89ADBCD7EB03E18C07CD5A5 /* PasskeyAuth.swift */,
 				86067DB7752941A2B1F87F1C /* ReceiptsView.swift */,
+				0C2F4932929429BFD28B0EFF /* AdminDesign.swift */,
+				456041C2BAF9EAA2906324B8 /* PSSkeleton.swift */,
+				726C44708F41014D3633FC92 /* PSDeepLink.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -297,6 +306,9 @@
 				0A36CE3204E315CD688C4020 /* TermsView.swift in Sources */,
 				3F2147FD403A0EDDEDBF75C5 /* PasskeyAuth.swift in Sources */,
 				ADECEC1C624DEBBAD7532617 /* ReceiptsView.swift in Sources */,
+				301A4F8EA22067FE40F411FC /* AdminDesign.swift in Sources */,
+				8D414D64ABC047FABD50AEE4 /* PSSkeleton.swift in Sources */,
+				6E1F46CD89396605FAE557DD /* PSDeepLink.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

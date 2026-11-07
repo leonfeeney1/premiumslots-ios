@@ -196,6 +196,18 @@ extension View {
     func psTextStyle(_ style: PSTextStyle) -> some View {
         font(style.font)
     }
+
+    /// Full-screen screen background: the brand background colour
+    /// extends edge to edge, under the tab bar and the home
+    /// indicator, while the content itself keeps its safe area.
+    /// Use this instead of .background(Color.psBackground) on every
+    /// root ScrollView, List or Group. The top edge is left alone:
+    /// content starts below the notch and Dynamic Island on first
+    /// appearance and only scrolls under the bar once the user
+    /// scrolls, and the opaque navigation bar covers the top.
+    func psScreenBackground() -> some View {
+        background(Color.psBackground.ignoresSafeArea(edges: .bottom))
+    }
 }
 
 struct PSPrimaryButtonStyle: ButtonStyle {

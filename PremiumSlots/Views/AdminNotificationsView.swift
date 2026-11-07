@@ -67,30 +67,43 @@ struct AdminNotificationsRootView: View {
     @State private var loadError: String?
     @State private var actionMessage: String?
     @State private var isMarkingRead = false
+    /// Deep-link destination for the tapped notification. Set by
+    /// the row tap; navigationDestination below pushes the real
+    /// admin screen for that event. No tap is dead.
+    @State private var destination: AdminNotificationDestination?
 
     var body: some View {
         Group {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && notifications.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading notifications")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    AdminSkeletonView(lines: 5, title: "Loading notifications")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let loadError, notifications.isEmpty {
                 PSErrorState(message: loadError) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Notifications")
+        .navigationDestination(item: $destination) { target in
+            switch target {
+            case .subscription(let id):
+                AdminSubscriptionsRootView(preselectedSubscriptionId: id)
+            case .ticket(let id):
+                AdminTicketsRootView(highlightedTicketId: id)
+            case .deposit(let id):
+                AdminWalletRootView(highlightedDepositId: id)
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task {
@@ -143,36 +156,51 @@ struct AdminNotificationsRootView: View {
             } else {
                 Section("Newest first") {
                     ForEach(notifications) { item in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: item.systemImage)
-                                .font(.psIcon)
-                                .foregroundStyle(item.tint)
-                                .frame(width: 22)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack {
-                                    Text(item.title)
-                                        .font(.psHeadline)
-                                    if item.isUnread {
-                                        Circle()
-                                            .fill(Color.psCyan)
-                                            .frame(width: 8, height: 8)
-                                            .accessibilityLabel("Unread")
+                        Button {
+                            openNotification(item)
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: item.systemImage)
+                                    .font(.psIcon)
+                                    .foregroundStyle(item.tint)
+                                    .frame(width: 22)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text(item.title)
+                                            .font(.psHeadline)
+                                            .foregroundStyle(.psText)
+                                        if item.isUnread {
+                                            Circle()
+                                                .fill(Color.psCyan)
+                                                .frame(width: 8, height: 8)
+                                                .accessibilityLabel("Unread")
+                                        }
                                     }
-                                }
-                                if let detail = item.detail, !detail.isEmpty {
-                                    Text(detail)
-                                        .font(.psBody)
-                                        .foregroundStyle(.psMuted)
-                                }
-                                if !item.relativeDate.isEmpty {
-                                    Text(item.relativeDate)
+                                    if let detail = item.detail, !detail.isEmpty {
+                                        Text(detail)
+                                            .font(.psBody)
+                                            .foregroundStyle(.psMuted)
+                                    }
+                                    if !item.relativeDate.isEmpty {
+                                        Text(item.relativeDate)
+                                            .font(.psCaption)
+                                            .foregroundStyle(.psMuted)
+                                    }
+                                    Text(destinationLabel(for: item))
                                         .font(.psCaption)
-                                        .foregroundStyle(.psMuted)
+                                        .foregroundStyle(.psCyan)
                                 }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.psCaption)
+                                    .foregroundStyle(.psMuted)
+                                    .accessibilityHidden(true)
                             }
                         }
+                        .buttonStyle(.plain)
                         .psTouchTarget()
+                        .accessibilityLabel("\(item.title). Open \(destinationLabel(for: item).lowercased()).")
                     }
                 }
             }
@@ -191,24 +219,64 @@ struct AdminNotificationsRootView: View {
         }
     }
 
+    /// Plain-language destination for a notification row, so the
+    /// tap target is honest about where it goes.
+    private func destinationLabel(for item: AdminNotification) -> String {
+        guard let target = AdminNotificationDestination.from(notification: item) else {
+            return "Open notifications"
+        }
+        switch target {
+        case .subscription: return "Open subscription"
+        case .ticket: return "Open ticket"
+        case .deposit: return "Open deposit"
+        }
+    }
+
+    /// Opens the destination for a tapped notification. A
+    /// notification with no usable reference id stays on this
+    /// list and says so instead of navigating nowhere.
+    private func openNotification(_ item: AdminNotification) {
+        guard let target = AdminNotificationDestination.from(notification: item) else {
+            actionMessage = "This event has no linked order, ticket or deposit to open."
+            return
+        }
+        destination = target
+    }
+
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        // Cache first: show the last saved feed immediately, then
+        // refresh live.
+        if let cached = AdminCache.load(key: "admin-notifications"),
+           let decoded = try? JSONDecoder().decode(AdminNotificationsResponse.self, from: cached),
+           decoded.ok {
+            notifications = decoded.notifications ?? []
+            unreadCount = decoded.unread_count
+        }
         isLoading = true
         loadError = nil
         defer { isLoading = false }
         do {
-            let response = try await APIClient.shared.adminNotifications()
+            let data = try await APIClient.shared.fetchData("api/v1/admin/notifications")
+            let response = try JSONDecoder().decode(AdminNotificationsResponse.self, from: data)
             guard response.ok else {
-                loadError = "Admin needs the live API. The notifications endpoint did not return data."
+                if notifications.isEmpty {
+                    loadError = "Admin needs the live API. The notifications endpoint did not return data."
+                }
                 return
             }
+            AdminCache.save(data, key: "admin-notifications")
             notifications = response.notifications ?? []
             unreadCount = response.unread_count
             if let unreadCount {
                 appState.adminUnreadCount = unreadCount
             }
         } catch {
-            loadError = error.localizedDescription
+            if notifications.isEmpty {
+                loadError = error.localizedDescription
+            } else {
+                actionMessage = "Live refresh failed: \(error.localizedDescription). Showing the last saved notifications."
+            }
         }
     }
 

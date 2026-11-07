@@ -58,6 +58,7 @@ struct CustomerNotificationBell: View {
 }
 
 struct NotificationsRootView: View {
+    @EnvironmentObject private var appState: AppState
     @State private var notifications: [NtfNotification] = []
     @State private var unreadCount: Int?
     @State private var isLoading = false
@@ -101,13 +102,9 @@ struct NotificationsRootView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             } else if isLoading && notifications.isEmpty {
-                HStack {
-                    Spacer()
-                    PSRingSpinner(diameter: 28, lineWidth: 3)
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                PSSkeletonRows(count: 4)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             } else if notifications.isEmpty {
                 PSEmptyState(
                     systemImage: "bell",
@@ -119,48 +116,19 @@ struct NotificationsRootView: View {
             } else {
                 Section("Last 30") {
                     ForEach(notifications) { item in
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: icon(for: item.kindKey))
-                                .imageScale(.large)
-                                .foregroundStyle(.psCyan)
-                                .frame(width: 22)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack {
-                                    Text(item.title ?? item.kind ?? "Notification")
-                                        .font(.psHeadline)
-                                    if item.isUnread {
-                                        Circle()
-                                            .fill(Color.psCyan)
-                                            .frame(width: 8, height: 8)
-                                            .accessibilityLabel("Unread")
-                                    }
-                                }
-                                if let kind = item.kind, !kind.isEmpty {
-                                    Text(psCapitalized(kind.replacingOccurrences(of: "_", with: " ")))
-                                        .font(.psCaption)
-                                        .foregroundStyle(.psMuted)
-                                }
-                                if let body = item.bodyText, !body.isEmpty {
-                                    Text(body)
-                                        .font(.psBody)
-                                        .foregroundStyle(.psMuted)
-                                }
-                                if let date = item.created_at {
-                                    Text(psShortDate(date))
-                                        .font(.psCaption)
-                                        .foregroundStyle(.psMuted)
-                                }
-                                if item.isUnread, let id = item.id {
-                                    Button("Mark as read") {
-                                        Task { await markRead(ids: [id]) }
-                                    }
-                                    .font(.psCaption)
-                                    .accessibilityLabel("Mark notification as read")
-                                }
-                            }
+                        // Every row navigates: tapping marks the
+                        // notification read (queue rows only; derived
+                        // rows have no row to mark and clear when
+                        // the underlying item changes) and posts a
+                        // deep link that ContentView routes to the
+                        // right screen. No dead taps.
+                        Button {
+                            Task { await open(item) }
+                        } label: {
+                            notificationRow(item)
                         }
-                        .psTouchTarget()
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Notification: \(item.title ?? item.kind ?? "Notification"). Tap to open.")
                     }
                 }
             }
@@ -168,7 +136,7 @@ struct NotificationsRootView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
@@ -187,6 +155,91 @@ struct NotificationsRootView: View {
         case "expiry", "renewal": return "clock.fill"
         default: return "bell.fill"
         }
+    }
+
+    /// Row content for one notification, with its destination
+    /// hint so the tap target reads as a navigation row.
+    private func notificationRow(_ item: NtfNotification) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon(for: item.kindKey))
+                .imageScale(.large)
+                .foregroundStyle(.psCyan)
+                .frame(width: 22)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(item.title ?? item.kind ?? "Notification")
+                        .font(.psHeadline)
+                        .multilineTextAlignment(.leading)
+                    if item.isUnread {
+                        Circle()
+                            .fill(Color.psCyan)
+                            .frame(width: 8, height: 8)
+                            .accessibilityLabel("Unread")
+                    }
+                }
+                if let kind = item.kind, !kind.isEmpty {
+                    Text(psCapitalized(kind.replacingOccurrences(of: "_", with: " ")))
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                }
+                if let body = item.bodyText, !body.isEmpty {
+                    Text(body)
+                        .font(.psBody)
+                        .foregroundStyle(.psMuted)
+                }
+                if let date = item.created_at {
+                    Text(psShortDate(date))
+                        .font(.psCaption)
+                        .foregroundStyle(.psMuted)
+                }
+                Text(destinationHint(for: item))
+                    .font(.psCaption)
+                    .foregroundStyle(.psCyan)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.psIconSmall)
+                .foregroundStyle(.psMuted)
+                .accessibilityHidden(true)
+        }
+        .psTouchTarget()
+    }
+
+    /// Short hint naming where a tap goes, from the same
+    /// resolution ContentView will route to.
+    private func destinationHint(for item: NtfNotification) -> String {
+        switch PSDeepLink.from(notification: item, subscriptions: appState.liveSubscriptions) {
+        case .subscription: return "Open in My Slots"
+        case .mySlots: return "Open My Slots"
+        case .ticket: return "Open support tickets"
+        case .wallet: return "Open wallet"
+        case .catalogue: return "Open catalogue"
+        case .dashboard: return "Open dashboard"
+        case .giftCards: return "Open gift cards"
+        case .help: return "Open help centre"
+        case .wishlist: return "Open wishlist"
+        case .home: return "Open home"
+        }
+    }
+
+    /// Mark read (queue rows only) and navigate. Derived rows
+    /// (negative ids) have no NotificationQueue row to mark, so
+    /// the server call is skipped for them and the tap still
+    /// navigates.
+    private func open(_ item: NtfNotification) async {
+        if item.isUnread, let id = item.id, id > 0 {
+            do {
+                let _: APIResponse = try await APIClient.shared.fetchOK(
+                    "api/v1/me/notifications/read", method: "POST", body: ["ids": [id]])
+            } catch {
+                // A failed mark-read must not block navigation.
+            }
+        }
+        PSDeepLinkRouter.post(
+            PSDeepLink.from(notification: item, subscriptions: appState.liveSubscriptions)
+        )
+        await load()
     }
 
     private func load() async {
@@ -264,5 +317,6 @@ struct NtfResponse: Decodable {
 #Preview {
     NavigationStack {
         NotificationsRootView()
+            .environmentObject(AppState())
     }
 }

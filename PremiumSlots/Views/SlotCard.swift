@@ -1,10 +1,15 @@
 import SwiftUI
 
-// MARK: - Grid slot card, v4
+// MARK: - Grid slot card, v4 (v6: second design pass)
 // Polished grid card used by the catalogue and the Home preview.
 // Real platform logo on top, name, price per slot in KES and a
 // stock pill. Sold-out cards show a waitlist action instead of a
-// price push. Stock pill colours are flat tints, never a glowing dot.
+// price push. Stock pill colours are flat tints, never a glowing
+// dot. Low stock (5 or fewer left) reads in amber with the exact
+// count, plenty of stock in the success tint, sold out in the
+// danger tint. The card is one even height in the grid: the
+// tagline is capped at two lines and the price block is pinned
+// to the bottom, so rows line up.
 
 struct SlotCard: View {
     let platform: Platform
@@ -14,7 +19,7 @@ struct SlotCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
-                PlatformLogoView(platform: platform, size: 52)
+                PlatformLogoView(platform: platform, size: 56)
                 Spacer()
                 stockPill
             }
@@ -40,9 +45,21 @@ struct SlotCard: View {
                         .psTextStyle(.caption)
                         .foregroundStyle(.psMuted)
                 }
-                Text(platform.duration)
-                    .psTextStyle(.caption)
-                    .foregroundStyle(.psMuted)
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
+                        .accessibilityHidden(true)
+                    Text(platform.duration)
+                        .psTextStyle(.caption)
+                        .foregroundStyle(.psMuted)
+                    Spacer()
+                    if !platform.isSoldOut, platform.slotsLeft <= 5 {
+                        Text("Only \(platform.slotsLeft) left")
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psAmber)
+                    }
+                }
 
                 if platform.isSoldOut {
                     Button {
@@ -63,15 +80,26 @@ struct SlotCard: View {
                             ? "On the waitlist for \(platform.name)"
                             : "Join the waitlist for \(platform.name)"
                     )
+                } else {
+                    HStack(spacing: 4) {
+                        Text("Reserve")
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psCyan)
+                        Image(systemName: "chevron.right")
+                            .font(.psIconSmall)
+                            .foregroundStyle(.psCyan)
+                            .accessibilityHidden(true)
+                    }
+                    .accessibilityHidden(true)
                 }
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 196, alignment: .leading)
         .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.psBorder, lineWidth: 1)
         )
         .opacity(platform.isSoldOut ? 0.85 : 1)

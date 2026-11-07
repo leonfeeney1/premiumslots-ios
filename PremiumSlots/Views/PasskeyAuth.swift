@@ -85,6 +85,40 @@ import AuthenticationServices
 //     will fail the same way. Registration, list and remove are not
 //     affected by this defect.
 //
+// v6 fixes (7 Nov 2026, second report that adding a passkey does
+// not work). App-side bugs found by reading this flow against the
+// workspace backend passkey endpoints (api_v1.py:778-1185):
+//   1. authenticate() ignored the allowCredentials list the server
+//      returns in auth-options. A passkey created with residentKey
+//      preferred is not guaranteed discoverable, so the system
+//      sheet could offer no credential at all, or the wrong one,
+//      and verify then 404s. The allow list is now passed to the
+//      platform provider when it is non-empty.
+//   2. authenticationPayload used guard let on rawAuthenticatorData
+//      and signature, which are non-Optional Data on
+//      ASAuthorizationPlatformPublicKeyCredentialAssertion. They
+//      are now read directly; only rawAttestationObject on the
+//      registration credential is Optional and keeps a guard.
+//   3. The manager was not MainActor-isolated, so
+//      performRequests could run off the main thread. It is now
+//      @MainActor, and the presentation anchor falls back to the
+//      first window of the first scene instead of a fresh UIWindow
+//      that belongs to no scene.
+//   4. A server RP id that differs from the app RP id used to fail
+//      inside the system sheet with no readable error. Both flows
+//      now check options.rp.id / options.rpId against
+//      premiumslots.tech first and report the mismatch plainly.
+//   5. auth-verify can answer needs_verification for an unverified
+//      account; the app ignored that field and reported a generic
+//      session failure. It now surfaces the verification step.
+// The credential id stays base64url everywhere, matching what
+// registration stores and what auth-verify looks up. The web hex
+// lookup defect is NOT mirrored here. Still needs, outside this
+// file: Associated Domains capability webcredentials:premiumslots.tech
+// in Xcode plus the apple-app-site-association file on
+// premiumslots.tech (backend agent owns the file contents), and
+// the live WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN env values must equal
+// premiumslots.tech / https://premiumslots.tech.
 // The credential id of the passkey created on this device is kept
 // in UserDefaults under "premiumslots.passkey.credentialId" so the
 // Security screen can show whether this device has a passkey. The
@@ -175,9 +209,18 @@ struct PasskeyVerifyResponse: Decodable {
     let error: String?
     let message: String?
     let redirect: String?
+    let needs_verification: Bool?
 
     var succeeded: Bool { ok == true || success == true }
     var serverMessage: String? { error ?? message }
+}
+
+/// Result of a verify call, kept separate from the wire shape so
+/// the caller can see needs_verification.
+struct PasskeyVerifyResult {
+    let succeeded: Bool
+    let needsVerification: Bool
+    let serverMessage: String?
 }
 
 struct PasskeyListResponse: Decodable {
@@ -194,6 +237,7 @@ struct PasskeyListResponse: Decodable {
 
 // MARK: - Passkey manager (ASAuthorizationController)
 
+@MainActor
 final class PasskeyAuthManager: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     /// RP id from the live host. See the header note: the server
     /// env override WEBAUTHN_RP_ID is UNVERIFIED.
@@ -235,11 +279,23 @@ final class PasskeyAuthManager: NSObject, ASAuthorizationControllerDelegate, ASA
     // MARK: Authentication (sign-in)
 
     /// Runs the system passkey sheet and returns the assertion. The
-    /// caller posts it to auth-verify. The platform provider offers
-    /// this device's passkeys for the RP; no allow list is passed.
-    func authenticate(challenge: Data) async throws -> ASAuthorizationPlatformPublicKeyCredentialAssertion {
+    /// caller posts it to auth-verify. The server allow list is
+    /// passed when it is non-empty: without it the sheet can offer
+    /// no credential for a non-discoverable passkey, and verify
+    /// then fails. With an empty list the plain request is used.
+    func authenticate(challenge: Data, allowCredentialIDs: [Data] = []) async throws -> ASAuthorizationPlatformPublicKeyCredentialAssertion {
         let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: Self.relyingPartyID)
         let request = provider.createCredentialAssertionRequest(challenge: challenge)
+        // The platform provider has no allowCredentials parameter on
+        // the create call: the allow list goes on the request
+        // object itself, as ASAuthorizationPlatformPublicKeyCredential
+        // descriptors. Without it the sheet can offer no credential
+        // for a non-discoverable passkey, and verify then fails.
+        if !allowCredentialIDs.isEmpty {
+            request.allowedCredentials = allowCredentialIDs.map {
+                ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
+            }
+        }
         return try await withCheckedThrowingContinuation { continuation in
             assertionContinuation = continuation
             let controller = ASAuthorizationController(authorizationRequests: [request])
@@ -291,11 +347,12 @@ final class PasskeyAuthManager: NSObject, ASAuthorizationControllerDelegate, ASA
     // MARK: ASAuthorizationControllerPresentationContextProviding
 
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        let keyWindow = UIApplication.shared.connectedScenes
+        let scenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow }
-        return keyWindow ?? UIWindow()
+        let keyWindow = scenes.flatMap { $0.windows }.first { $0.isKeyWindow }
+        if let keyWindow { return keyWindow }
+        if let anyWindow = scenes.flatMap({ $0.windows }).first { return anyWindow }
+        return UIWindow()
     }
 }
 
@@ -328,10 +385,12 @@ enum PasskeyWire {
     static func authenticationPayload(
         _ credential: ASAuthorizationPlatformPublicKeyCredentialAssertion
     ) throws -> [String: Any] {
-        guard let authenticatorData = credential.rawAuthenticatorData,
-              let signature = credential.signature else {
-            throw PasskeyError.missingData("the assertion data")
-        }
+        // rawAuthenticatorData, signature and rawClientDataJSON are
+        // non-Optional Data on the assertion credential, so they
+        // are read directly. A guard let here would bind a
+        // non-Optional value.
+        let authenticatorData = credential.rawAuthenticatorData
+        let signature = credential.signature
         let clientData = credential.rawClientDataJSON
         var response: [String: Any] = [
             "clientDataJSON": clientData.passkeyBase64URL(),
@@ -351,12 +410,28 @@ enum PasskeyWire {
 
     /// POSTs a credential payload to a passkey verify endpoint and
     /// reports success from either the {"ok": true} or the
-    /// {"success": true} shape.
-    static func postVerify(_ path: String, payload: [String: Any]) async throws {
+    /// {"success": true} shape. Returns the full result so the
+    /// caller can see needs_verification, which the old void
+    /// version silently dropped.
+    static func postVerify(_ path: String, payload: [String: Any]) async throws -> PasskeyVerifyResult {
         let response: PasskeyVerifyResponse = try await APIClient.shared.fetchJSON(path, method: "POST", body: payload)
         guard response.succeeded else {
             throw APIError.message(response.serverMessage ?? "Passkey verification failed.")
         }
+        return PasskeyVerifyResult(
+            succeeded: true,
+            needsVerification: response.needs_verification == true,
+            serverMessage: response.serverMessage
+        )
+    }
+
+    /// User id bytes for registration: the server sends the user id
+    /// base64url-encoded (base64url of the ASCII user id). If that
+    /// decode ever fails, fall back to the raw UTF-8 bytes instead
+    /// of failing the whole registration.
+    static func userIDData(from value: String) -> Data {
+        if let decoded = Data(passkeyBase64URL: value) { return decoded }
+        return Data(value.utf8)
     }
 }
 
@@ -443,13 +518,21 @@ struct PasskeySignInView: View {
         do {
             let options: PasskeyAuthOptions = try await APIClient.shared.fetchJSON(
                 "api/v1/auth/passkey/auth-options", method: "POST", body: ["email": trimmedEmail])
+            if let serverRP = options.rpId, serverRP != PasskeyAuthManager.relyingPartyID {
+                throw PasskeyError.failed("The server expects passkeys for \(serverRP), but this app uses \(PasskeyAuthManager.relyingPartyID). Ask support to check the server passkey settings.")
+            }
             guard let challenge = Data(passkeyBase64URL: options.challenge) else {
                 throw PasskeyError.missingData("the sign-in challenge")
             }
-            let assertion = try await manager.authenticate(challenge: challenge)
+            let allowIDs = (options.allowCredentials ?? []).compactMap { Data(passkeyBase64URL: $0.id) }
+            let assertion = try await manager.authenticate(challenge: challenge, allowCredentialIDs: allowIDs)
             let payload = try PasskeyWire.authenticationPayload(assertion)
-            try await PasskeyWire.postVerify("api/v1/auth/passkey/auth-verify", payload: payload)
+            let result = try await PasskeyWire.postVerify("api/v1/auth/passkey/auth-verify", payload: payload)
             PasskeyAuthManager.storeCredentialID(assertion.credentialID.passkeyBase64URL())
+            if result.needsVerification {
+                message = "Passkey verified. Check your email to finish verifying your account, then sign in."
+                return
+            }
             // The server sets the Flask session on verify, exactly
             // like a normal login, so confirm it the same way the
             // Clerk flow does: re-validate with /auth/me.
@@ -601,14 +684,17 @@ struct PasskeyManagementView: View {
         do {
             let options: PasskeyRegistrationOptions = try await APIClient.shared.fetchJSON(
                 "api/v1/auth/passkey/register-options", method: "POST", body: [:])
-            guard let challenge = Data(passkeyBase64URL: options.challenge),
-                  let userID = Data(passkeyBase64URL: options.user.id) else {
+            if let serverRP = options.rp.id, serverRP != PasskeyAuthManager.relyingPartyID {
+                throw PasskeyError.failed("The server expects passkeys for \(serverRP), but this app uses \(PasskeyAuthManager.relyingPartyID). Ask support to check the server passkey settings.")
+            }
+            guard let challenge = Data(passkeyBase64URL: options.challenge) else {
                 throw PasskeyError.missingData("the registration challenge")
             }
+            let userID = PasskeyWire.userIDData(from: options.user.id)
             let registration = try await manager.register(challenge: challenge, userID: userID, name: user.email)
             var payload = try PasskeyWire.registrationPayload(registration)
             payload["device_name"] = UIDevice.current.name
-            try await PasskeyWire.postVerify("api/v1/auth/passkey/register-verify", payload: payload)
+            _ = try await PasskeyWire.postVerify("api/v1/auth/passkey/register-verify", payload: payload)
             PasskeyAuthManager.storeCredentialID(registration.credentialID.passkeyBase64URL())
             message = "Passkey added on this device."
             await load()

@@ -134,13 +134,14 @@ struct WalletRootView: View {
         NavigationStack {
             Group {
                 if isLoading, data == nil {
-                    VStack(spacing: 16) {
-                        PSRingSpinner()
-                        Text("Loading wallet")
-                            .font(.psBody)
-                            .foregroundStyle(.psMuted)
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            PSSkeletonCard()
+                            PSSkeletonRows(count: 5)
+                        }
+                        .psScreenPadding()
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .scrollIndicators(.hidden)
                 } else if let errorMessage, data == nil {
                     PSErrorState(message: errorMessage) {
                         Task { await load() }
@@ -149,7 +150,7 @@ struct WalletRootView: View {
                     walletList
                 }
             }
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("Wallet")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -601,13 +602,14 @@ struct WalletStatementView: View {
     var body: some View {
         Group {
             if isLoading, data == nil {
-                VStack(spacing: 16) {
-                    PSRingSpinner()
-                    Text("Loading statement")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    VStack(spacing: 12) {
+                        PSSkeletonCard()
+                        PSSkeletonRows(count: 5)
+                    }
+                    .psScreenPadding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
             } else if let errorMessage, data == nil {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -616,7 +618,7 @@ struct WalletStatementView: View {
                 statementList
             }
         }
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Statement")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

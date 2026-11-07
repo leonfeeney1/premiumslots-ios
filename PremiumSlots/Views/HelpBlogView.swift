@@ -201,7 +201,7 @@ struct HelpRootView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Help centre")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
@@ -300,7 +300,7 @@ struct HelpArticleDetailView: View {
             .psScreenPadding()
         }
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Article")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -400,7 +400,7 @@ struct BlogRootView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Blog")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
@@ -513,7 +513,7 @@ struct BlogPostDetailView: View {
             .psScreenPadding()
         }
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Post")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -561,7 +561,7 @@ struct PrivacyView: View {
             .psScreenPadding()
         }
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -586,7 +586,7 @@ struct TermsView: View {
             .psScreenPadding()
         }
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Terms")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -692,7 +692,7 @@ struct ReceiptsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Receipts")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaPadding(.bottom, 8)

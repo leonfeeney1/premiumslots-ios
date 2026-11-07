@@ -305,7 +305,7 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .sheet(isPresented: $showAuth) {
                 AuthView()
                     .psSheetDetents()

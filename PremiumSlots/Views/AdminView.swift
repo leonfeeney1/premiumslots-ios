@@ -30,7 +30,7 @@ struct AdminView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollIndicators(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Admin")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable { await appState.refreshAdmin() }
@@ -52,10 +52,11 @@ struct AdminView: View {
     // MARK: - login
 
     private var adminLogin: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            RealLogoView(size: 48)
-            Text("Admin sign-in")
-                .font(.psTitle)
+        PSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                RealLogoView(size: 48)
+                Text("Admin sign-in")
+                    .font(.psTitle)
             Text("This is a separate sign-in from a customer account. It unlocks the live admin dashboard.")
                 .font(.psBody)
                 .foregroundStyle(.psMuted)
@@ -77,10 +78,11 @@ struct AdminView: View {
             }
             .psPrimary()
             .disabled(isSubmitting || password.isEmpty)
-            if appState.liveState != .live {
-                Text("Admin needs a connection. Check your connection and try again.")
-                    .font(.psCaption)
-                    .foregroundStyle(.psAmber)
+                if appState.liveState != .live {
+                    Text("Admin needs a connection. Check your connection and try again.")
+                        .font(.psCaption)
+                        .foregroundStyle(.psAmber)
+                }
             }
         }
     }
@@ -102,32 +104,28 @@ struct AdminView: View {
             NavigationLink {
                 AdminNotificationsRootView()
             } label: {
-                HStack {
-                    Label("Notifications", systemImage: "bell.fill")
-                        .font(.psBody)
-                    Spacer()
-                    if appState.adminUnreadCount > 0 {
-                        Text("\(appState.adminUnreadCount)")
+                PSCard {
+                    HStack {
+                        Label("Notifications", systemImage: "bell.fill")
+                            .font(.psBody)
+                            .foregroundStyle(.psText)
+                        Spacer()
+                        if appState.adminUnreadCount > 0 {
+                            Text("\(appState.adminUnreadCount)")
+                                .font(.psCaption)
+                                .foregroundStyle(.psObsidian)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.psAmber)
+                                .clipShape(Capsule())
+                                .accessibilityLabel("\(appState.adminUnreadCount) unread admin notifications")
+                        }
+                        Image(systemName: "chevron.right")
                             .font(.psCaption)
-                            .foregroundStyle(.psObsidian)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.psAmber)
-                            .clipShape(Capsule())
-                            .accessibilityLabel("\(appState.adminUnreadCount) unread admin notifications")
+                            .foregroundStyle(.psMuted)
+                            .accessibilityHidden(true)
                     }
-                    Image(systemName: "chevron.right")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                        .accessibilityHidden(true)
                 }
-                .padding(14)
-                .background(Color.psSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.psBorder, lineWidth: 1)
-                )
             }
             .accessibilityLabel("Open admin notifications")
 
@@ -141,14 +139,16 @@ struct AdminView: View {
             }
 
             if let stats = appState.adminStats {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    statCard(label: "Pending", value: stats.pending ?? 0)
-                    statCard(label: "Approved", value: stats.approved ?? 0)
-                    statCard(label: "Issues", value: stats.issues ?? 0)
-                    statCard(label: "Users", value: stats.users ?? 0)
-                    statCard(label: "Revenue (KES)", value: stats.total_revenue ?? 0)
-                    statCard(label: "Slots in rotation", value: stats.slots_in_rotation ?? 0)
+                AdminKPIGrid {
+                    AdminKPITile(label: "Pending", value: stats.pending.map { "\($0)" }, systemImage: "clock.fill", tint: .psAmber)
+                    AdminKPITile(label: "Approved", value: stats.approved.map { "\($0)" }, systemImage: "checkmark.circle.fill", tint: .psSuccess)
+                    AdminKPITile(label: "Issues", value: stats.issues.map { "\($0)" }, systemImage: "exclamationmark.circle.fill", tint: .psDanger)
+                    AdminKPITile(label: "Users", value: stats.users.map { "\($0)" }, systemImage: "person.2.fill", tint: .psCyan)
+                    AdminKPITile(label: "Revenue", value: stats.total_revenue.map { "KES \($0)" }, systemImage: "banknote.fill", tint: .psPrimary)
+                    AdminKPITile(label: "Slots in rotation", value: stats.slots_in_rotation.map { "\($0)" }, systemImage: "square.grid.2x2.fill", tint: .psCyan)
                 }
+            } else {
+                AdminSkeletonKPIGrid()
             }
 
             Picker("Section", selection: $selectedSection) {
@@ -255,28 +255,17 @@ struct AdminView: View {
         .accessibilityLabel("Open \(title)")
     }
 
-    private func statCard(label: String, value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(.psCaption)
-                .foregroundStyle(.psMuted)
-            Text("\(value)")
-                .font(.psTitle)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
     // MARK: - pending approvals
 
     private var pendingSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            PSSectionHeader(title: "Pending approvals")
             if appState.adminPending.isEmpty {
-                Text("No pending approvals.")
-                    .font(.psBody)
-                    .foregroundStyle(.psMuted)
+                PSEmptyState(
+                    systemImage: "clock.fill",
+                    title: "No pending approvals",
+                    body: "New subscription requests will appear here for approval."
+                )
             }
             ForEach(appState.adminPending) { sub in
                 pendingCard(sub)
@@ -407,11 +396,15 @@ struct ApproveCard: View {
     @State private var showError = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(subscription.service_requested)
-                        .font(.psHeadline)
+        PSCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(subscription.customerDisplayName)
+                            .font(.psHeadline)
+                        Text(subscription.service_requested)
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
                     Text("Order #\(subscription.id) · KES \(subscription.amount_due)")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
@@ -446,23 +439,21 @@ struct ApproveCard: View {
                     Task { await approve() }
                 }
                 .psPrimary()
-            } else {
-                HStack(spacing: 10) {
-                    Button("Approve") { showApprove = true }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.psSuccess)
+                } else {
+                    HStack(spacing: 10) {
+                        Button("Approve") { showApprove = true }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.psSuccess)
+                            .font(.psCaption)
+                        Button("Reject", role: .destructive) {
+                            Task { await reject() }
+                        }
+                        .buttonStyle(.bordered)
                         .font(.psCaption)
-                    Button("Reject", role: .destructive) {
-                        Task { await reject() }
                     }
-                    .buttonStyle(.bordered)
-                    .font(.psCaption)
                 }
             }
         }
-        .padding(12)
-        .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
         .alert("Admin action failed", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {

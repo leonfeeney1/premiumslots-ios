@@ -43,6 +43,11 @@ struct AdminWalletAdjustResponse: Decodable {
 }
 
 struct AdminWalletRootView: View {
+    /// Deep link from an admin notification: when set, that deposit
+    /// is pinned at the top of the list with its approve and reject
+    /// actions, so a tap lands on the deposit itself.
+    var highlightedDepositId: Int? = nil
+
     @EnvironmentObject private var appState: AppState
     @State private var deposits: [AdminDepositRow] = []
     @State private var customers: [AdminCustomerRow] = []
@@ -83,23 +88,22 @@ struct AdminWalletRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && deposits.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading wallet deposits")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    AdminSkeletonView(lines: 4, title: "Loading wallet deposits")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let errorMessage, deposits.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Wallet")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -128,8 +132,18 @@ struct AdminWalletRootView: View {
         }
     }
 
+    private var highlightedDeposit: AdminDepositRow? {
+        guard let target = highlightedDepositId else { return nil }
+        return deposits.first { $0.id == target }
+    }
+
     private var content: some View {
         List {
+            if let highlightedDeposit {
+                Section("From notification") {
+                    depositRow(highlightedDeposit)
+                }
+            }
             Section("Customer") {
                 TextField("Search name, email or WhatsApp", text: $customerSearch)
                     .autocorrectionDisabled()
@@ -339,18 +353,31 @@ struct AdminWalletRootView: View {
 
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        if let cached = AdminCache.load(key: "admin-wallet"),
+           let decoded = try? JSONDecoder().decode(AdminWalletResponse.self, from: cached),
+           decoded.ok {
+            deposits = decoded.deposits ?? []
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let result: AdminWalletResponse = try await APIClient.shared.fetchJSON("api/v1/admin/wallet")
+            let data = try await APIClient.shared.fetchData("api/v1/admin/wallet")
+            let result = try JSONDecoder().decode(AdminWalletResponse.self, from: data)
             guard result.ok else {
-                errorMessage = "Admin needs the live API. The wallet endpoint did not return data."
+                if deposits.isEmpty {
+                    errorMessage = "Admin needs the live API. The wallet endpoint did not return data."
+                }
                 return
             }
+            AdminCache.save(data, key: "admin-wallet")
             deposits = result.deposits ?? []
         } catch {
-            errorMessage = error.localizedDescription
+            if deposits.isEmpty {
+                errorMessage = error.localizedDescription
+            } else {
+                message = "Live refresh failed: \(error.localizedDescription). Showing the last saved deposits."
+            }
         }
         await loadCustomers()
     }
@@ -503,13 +530,15 @@ struct AdminGiftCardsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && cards.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading gift cards")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading gift cards")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, cards.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -519,7 +548,7 @@ struct AdminGiftCardsRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Gift cards")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -774,7 +803,7 @@ struct AdminIssueGiftCardSheet: View {
                 .psScreenPadding()
             }
             .scrollIndicators(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Issue gift card")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -845,13 +874,15 @@ struct AdminTransactionsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && transactions.isEmpty && ledger.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading transactions")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading transactions")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, transactions.isEmpty && ledger.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -861,7 +892,7 @@ struct AdminTransactionsRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Transactions")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -1022,13 +1053,15 @@ struct AdminPaymentMethodsView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && !hasLoaded && errorMessage == nil {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading payment methods")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading payment methods")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, !hasLoaded {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -1038,7 +1071,7 @@ struct AdminPaymentMethodsView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Payment methods")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }

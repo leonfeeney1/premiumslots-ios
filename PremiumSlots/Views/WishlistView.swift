@@ -17,6 +17,8 @@ struct WishlistRootView: View {
     @State private var kpis: WshKPIs?
     @State private var myVotedIds: Set<Int> = []
     @State private var myNotifyIds: Set<Int> = []
+    @State private var votingIds: Set<Int> = []
+    @State private var notifyingIds: Set<Int> = []
     @State private var isLoading = false
     @State private var loadError: String?
     @State private var actionMessage: String?
@@ -36,10 +38,17 @@ struct WishlistRootView: View {
     // hardcoded list is the fallback only. Statuses include
     // under_review: new suggestions are filed under that status by
     // the server, so "suggested" alone never matched them.
+    // The server list already starts with "All", so it is deduped
+    // here: a second "All" entry would give ForEach duplicate ids.
     private var categories: [String] {
-        serverCategories.isEmpty
-            ? ["All", "AI Tools", "Streaming", "Productivity", "Developer", "Design", "Security"]
-            : ["All"] + serverCategories
+        if serverCategories.isEmpty {
+            return ["All", "AI Tools", "Streaming", "Productivity", "Developer", "Design", "Security"]
+        }
+        var seen: [String] = []
+        for category in ["All"] + serverCategories where !seen.contains(category) {
+            seen.append(category)
+        }
+        return seen
     }
     private let statuses = ["all", "suggested", "under_review", "planned", "available"]
     private let sorts = [("votes", "Most voted"), ("newest", "Newest"), ("price_asc", "Lowest price")]
@@ -104,13 +113,9 @@ struct WishlistRootView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             } else if isLoading && items.isEmpty {
-                HStack {
-                    Spacer()
-                    PSRingSpinner(diameter: 28, lineWidth: 3)
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                PSSkeletonRows(count: 4)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             } else if items.isEmpty {
                 PSEmptyState(
                     systemImage: "star",
@@ -169,7 +174,7 @@ struct WishlistRootView: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .tint(.psCyan)
-                                .disabled(!appState.isLoggedIn)
+                                .disabled(!appState.isLoggedIn || votingIds.contains(item.id ?? -1))
                                 .accessibilityLabel("Vote for \(item.title)")
                                 Button {
                                     Task { await toggleNotify(item) }
@@ -181,7 +186,7 @@ struct WishlistRootView: View {
                                     .font(.psCaption)
                                 }
                                 .buttonStyle(.bordered)
-                                .disabled(!appState.isLoggedIn)
+                                .disabled(!appState.isLoggedIn || notifyingIds.contains(item.id ?? -1))
                                 .accessibilityLabel("Notify me about \(item.title)")
                                 if myVotedIds.contains(item.id ?? -1) {
                                     Button("Remove vote") {
@@ -244,7 +249,7 @@ struct WishlistRootView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Wishlist")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
@@ -308,7 +313,9 @@ struct WishlistRootView: View {
     }
 
     private func vote(_ item: WshItem) async {
-        guard let id = item.id else { return }
+        guard let id = item.id, !votingIds.contains(id) else { return }
+        votingIds.insert(id)
+        defer { votingIds.remove(id) }
         do {
             // The server vote endpoint TOGGLES: voting again removes
             // the vote. The old code marked the item voted before the
@@ -335,7 +342,9 @@ struct WishlistRootView: View {
     }
 
     private func toggleNotify(_ item: WshItem) async {
-        guard let id = item.id else { return }
+        guard let id = item.id, !notifyingIds.contains(id) else { return }
+        notifyingIds.insert(id)
+        defer { notifyingIds.remove(id) }
         do {
             struct NotifyResponse: Decodable { let ok: Bool; let notify_me: Bool? }
             let response: NotifyResponse = try await APIClient.shared.fetchJSON(
@@ -385,8 +394,10 @@ struct WishlistRootView: View {
 // The list returns the full WishlistItems row: the vote count is
 // "votes_count" and the price is "estimated_price", not "votes" and
 // "price". Reading those names left every row at 0 votes with no
-// price. There is no delete endpoint on the server: removing an
-// item means removing your vote (the vote endpoint toggles) or
+// price. The decoder below still accepts the short names as a
+// fallback, so a backend that answers with either shape decodes.
+// There is no delete endpoint on the server: removing an item
+// means removing your vote (the vote endpoint toggles) or
 // turning its notify-me off.
 
 struct WshItem: Decodable, Identifiable {
@@ -400,8 +411,20 @@ struct WshItem: Decodable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, category, status
-        case votes = "votes_count"
-        case price = "estimated_price"
+        case votes_count, votes, estimated_price, price
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        votes = try container.decodeIfPresent(Int.self, forKey: .votes_count)
+            ?? container.decodeIfPresent(Int.self, forKey: .votes)
+        price = try container.decodeIfPresent(Int.self, forKey: .estimated_price)
+            ?? container.decodeIfPresent(Int.self, forKey: .price)
     }
 }
 

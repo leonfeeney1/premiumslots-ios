@@ -20,6 +20,10 @@ struct AdminTicketsResponse: Decodable {
 }
 
 struct AdminTicketsRootView: View {
+    /// Deep link from an admin notification: when set, that ticket
+    /// is pinned at the top of the list so a tap lands on it.
+    var highlightedTicketId: Int? = nil
+
     @EnvironmentObject private var appState: AppState
     @State private var tickets: [AdminGenericRow] = []
     @State private var isLoading = false
@@ -37,23 +41,22 @@ struct AdminTicketsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && tickets.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading tickets")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    AdminSkeletonView(lines: 4, title: "Loading tickets")
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let errorMessage, tickets.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Support tickets")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -71,6 +74,11 @@ struct AdminTicketsRootView: View {
         }
     }
 
+    private var highlightedTicket: AdminGenericRow? {
+        guard let target = highlightedTicketId else { return nil }
+        return tickets.first { $0.id == target }
+    }
+
     private var content: some View {
         List {
             if let message {
@@ -78,6 +86,11 @@ struct AdminTicketsRootView: View {
                     Text(message)
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
+                }
+            }
+            if let highlightedTicket {
+                Section("From notification") {
+                    ticketRow(highlightedTicket)
                 }
             }
             Section("Open (\(openTickets.count))") {
@@ -145,18 +158,31 @@ struct AdminTicketsRootView: View {
 
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        if let cached = AdminCache.load(key: "admin-tickets"),
+           let decoded = try? JSONDecoder().decode(AdminTicketsResponse.self, from: cached),
+           decoded.ok {
+            tickets = decoded.tickets ?? []
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let result: AdminTicketsResponse = try await APIClient.shared.fetchJSON("api/v1/admin/tickets")
+            let data = try await APIClient.shared.fetchData("api/v1/admin/tickets")
+            let result = try JSONDecoder().decode(AdminTicketsResponse.self, from: data)
             guard result.ok else {
-                errorMessage = "Admin needs the live API. The tickets endpoint did not return data."
+                if tickets.isEmpty {
+                    errorMessage = "Admin needs the live API. The tickets endpoint did not return data."
+                }
                 return
             }
+            AdminCache.save(data, key: "admin-tickets")
             tickets = result.tickets ?? []
         } catch {
-            errorMessage = error.localizedDescription
+            if tickets.isEmpty {
+                errorMessage = error.localizedDescription
+            } else {
+                message = "Live refresh failed: \(error.localizedDescription). Showing the last saved tickets."
+            }
         }
     }
 
@@ -240,7 +266,7 @@ struct AdminWaitlistView: View {
                 .scrollIndicators(.hidden)
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Waitlist")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -286,13 +312,15 @@ struct AdminSuggestionsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && suggestions.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading suggestions")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading suggestions")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, suggestions.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -302,7 +330,7 @@ struct AdminSuggestionsRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Suggestions")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -487,7 +515,7 @@ struct AdminCommsView: View {
                 .scrollIndicators(.hidden)
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Comms")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -580,13 +608,15 @@ struct AdminSecurityLogsView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && logs.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading security logs")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading security logs")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, logs.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -596,7 +626,7 @@ struct AdminSecurityLogsView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Security logs")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -767,13 +797,15 @@ struct AdminRecycleBinView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && users.isEmpty && subscriptions.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading recycle bin")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading recycle bin")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, users.isEmpty && subscriptions.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -783,7 +815,7 @@ struct AdminRecycleBinView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Recycle bin")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -909,13 +941,15 @@ struct AdminBackupStatusView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && tables.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading backup status")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading backup status")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, tables.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -925,7 +959,7 @@ struct AdminBackupStatusView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Backup status")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }

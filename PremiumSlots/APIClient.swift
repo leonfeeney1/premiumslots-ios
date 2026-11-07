@@ -134,6 +134,16 @@ struct APISubscription: Decodable, Identifiable {
     let account_group: String?
     let locked_price: Int?
     let created_at: String?
+    /// Server-computed days remaining, signed (negative means
+    /// expired). Returned by _subscription_row when an expiry date
+    /// exists; absent on older backends.
+    let days_remaining: Int?
+    /// Current auto-renew flag, returned when the column exists.
+    let auto_renew: Bool?
+    /// True once the customer asked for a review of this slot.
+    /// Returned when the backend carries the column; absent on
+    /// older backends, so the app treats nil as not requested.
+    let review_requested: Bool?
     /// Customer identity, v4 admin: the admin subscriptions endpoint
     /// JOINs Users, so these carry the current Users values
     /// (customer_name from Users.name, customer_whatsapp from
@@ -146,7 +156,8 @@ struct APISubscription: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, service_requested, amount_due, mpesa_code, delivery_type
         case status, expiry_date, viewed, issue_reported, account_group
-        case locked_price, created_at, customer_name
+        case locked_price, created_at, days_remaining, auto_renew
+        case review_requested, customer_name
         case customer_whatsapp = "whatsapp_number"
         case customer_email = "email"
     }
@@ -463,6 +474,15 @@ final class APIClient: ObservableObject {
 
     func reportIssue(subscriptionId: Int) async throws {
         let _: APIResponse = try await postOK("api/v1/subscription/\(subscriptionId)/report-issue")
+    }
+
+    /// Web POST /subscription/request-review, exposed by the API as
+    /// POST /api/v1/me/subscriptions/<id>/request-review. Sets
+    /// review_requested on the subscription. Typed wrapper so the
+    /// call site does not use the generic fetch helper.
+    func requestReview(subscriptionId: Int) async throws {
+        let _: APIResponse = try await postOK(
+            "api/v1/me/subscriptions/\(subscriptionId)/request-review", body: [:])
     }
 
     func toggleAutoRenew(subscriptionId: Int) async throws -> Bool {

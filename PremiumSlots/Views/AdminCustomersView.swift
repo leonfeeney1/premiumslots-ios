@@ -143,13 +143,15 @@ struct AdminCustomersRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && customers.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading customers")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading customers")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, customers.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -159,7 +161,7 @@ struct AdminCustomersRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Customers")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -341,18 +343,33 @@ struct AdminCustomersRootView: View {
 
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        // Cache first: show the last saved list immediately, then
+        // refresh live.
+        if let cached = AdminCache.load(key: "admin-customers"),
+           let decoded = try? JSONDecoder().decode(AdminCustomersListResponse.self, from: cached),
+           decoded.ok {
+            customers = decoded.customers ?? []
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let result: AdminCustomersListResponse = try await APIClient.shared.fetchJSON("api/v1/admin/customers")
+            let data = try await APIClient.shared.fetchData("api/v1/admin/customers")
+            let result = try JSONDecoder().decode(AdminCustomersListResponse.self, from: data)
             guard result.ok else {
-                errorMessage = "Admin needs the live API. The customers endpoint did not return data."
+                if customers.isEmpty {
+                    errorMessage = "Admin needs the live API. The customers endpoint did not return data."
+                }
                 return
             }
+            AdminCache.save(data, key: "admin-customers")
             customers = result.customers ?? []
         } catch {
-            errorMessage = error.localizedDescription
+            if customers.isEmpty {
+                errorMessage = error.localizedDescription
+            } else {
+                actionMessage = "Live refresh failed: \(error.localizedDescription). Showing the last saved customers."
+            }
         }
     }
 
@@ -428,8 +445,7 @@ struct AdminCustomerDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if isLoading {
-                        PSRingSpinner(diameter: 40, lineWidth: 4)
-                            .frame(maxWidth: .infinity)
+                        AdminSkeletonView(lines: 4, title: "Loading customer")
                     } else if let errorMessage {
                         PSErrorState(message: errorMessage) {
                             Task { await loadDetail() }
@@ -441,7 +457,7 @@ struct AdminCustomerDetailSheet: View {
                 .psScreenPadding()
             }
             .scrollIndicators(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle(customer.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -796,7 +812,7 @@ struct AdminCreateCustomerSheet: View {
                 .psScreenPadding()
             }
             .scrollIndicators(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Create customer")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

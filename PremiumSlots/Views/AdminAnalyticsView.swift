@@ -259,6 +259,9 @@ struct AdminDailyRevenue: Decodable {
 struct AdminAnalyticsTotals: Decodable {
     let revenue: Int?
     let orders: Int?
+    let revenueThisMonth: Int?
+    let users: Int?
+    let activeSubs: Int?
 
     enum CodingKeys: String, CodingKey {
         case revenue, orders, users, active_subs, revenue_this_month
@@ -268,6 +271,38 @@ struct AdminAnalyticsTotals: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         revenue = container.adminInt(forKey: .revenue)
         orders = container.adminInt(forKey: .orders)
+        revenueThisMonth = container.adminInt(forKey: .revenue_this_month)
+        users = container.adminInt(forKey: .users)
+        activeSubs = container.adminInt(forKey: .active_subs)
+    }
+}
+
+/// One row of the real subscriptions-by-service breakdown the
+/// backend returns: {"service", "count", "active_count"}. This is
+/// a count breakdown, not revenue: the revenue-by-service rows
+/// (AdminByServiceRow) are a different shape and must never be
+/// read from these rows, or revenue would show as KES 0.
+struct AdminSubsByServiceRow: Decodable, Identifiable {
+    let service: String
+    let count: Int
+    let activeCount: Int?
+
+    var id: String { service }
+
+    enum CodingKeys: String, CodingKey {
+        case service, service_requested, count, orders, active_count, activeCount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        service = try container.decodeIfPresent(String.self, forKey: .service)
+            ?? container.decodeIfPresent(String.self, forKey: .service_requested)
+            ?? "Service"
+        count = container.adminInt(forKey: .count)
+            ?? container.adminInt(forKey: .orders)
+            ?? 0
+        activeCount = container.adminInt(forKey: .active_count)
+            ?? container.adminInt(forKey: .activeCount)
     }
 }
 
@@ -376,7 +411,23 @@ struct AdminAnalyticsResponse: Decodable {
     let totals: AdminAnalyticsTotals?
     var byService: [AdminByServiceRow]?
     var byStatus: [AdminByStatusRow]?
+    var subscriptionsByService: [AdminSubsByServiceRow]?
+    var subscriptionsByStatus: [AdminByStatusRow]?
+    var ticketsByStatus: [AdminByStatusRow]?
+    let notes: [String]?
     let churn: AdminChurn
+
+    /// Revenue and orders summed from the daily rows actually
+    /// returned for the selected range. The backend totals object
+    /// is overwritten by its extras with all-time figures, so the
+    /// range figures must be computed here, never read from totals.
+    var rangeRevenue: Int? {
+        dailyRevenue.isEmpty ? nil : dailyRevenue.reduce(0) { $0 + ($1.revenue ?? 0) }
+    }
+
+    var rangeOrders: Int? {
+        dailyRevenue.isEmpty ? nil : dailyRevenue.reduce(0) { $0 + ($1.orders ?? 0) }
+    }
 
     /// Legacy accessors kept so existing call sites keep working.
     var daily_revenue: [AdminDailyRevenue]? { dailyRevenue.isEmpty ? nil : dailyRevenue }
@@ -390,6 +441,8 @@ struct AdminAnalyticsResponse: Decodable {
         case totals
         case by_service, top_services
         case by_status
+        case subscriptions_by_service, subscriptions_by_status, tickets_by_status
+        case notes
         case churn, churn_users, churn_count, churn_note
     }
 
@@ -403,22 +456,30 @@ struct AdminAnalyticsResponse: Decodable {
         // whole screen. A mismatched type reads as nil instead.
         service = (try? container.decodeIfPresent(String.self, forKey: .service)) ?? nil
         status = (try? container.decodeIfPresent(String.self, forKey: .status)) ?? nil
-        let newDays = try container.decodeIfPresent([AdminDailyRevenue].self, forKey: .revenue_by_day)
-        let oldDays = try container.decodeIfPresent([AdminDailyRevenue].self, forKey: .daily_revenue)
+        let newDays = (try? container.decodeIfPresent([AdminDailyRevenue].self, forKey: .revenue_by_day)) ?? nil
+        let oldDays = (try? container.decodeIfPresent([AdminDailyRevenue].self, forKey: .daily_revenue)) ?? nil
         dailyRevenue = newDays ?? oldDays ?? []
-        totals = try container.decodeIfPresent(AdminAnalyticsTotals.self, forKey: .totals)
-        var serviceRows = try container.decodeIfPresent([AdminByServiceRow].self, forKey: .by_service)
+        totals = (try? container.decodeIfPresent(AdminAnalyticsTotals.self, forKey: .totals)) ?? nil
+        var serviceRows = (try? container.decodeIfPresent([AdminByServiceRow].self, forKey: .by_service)) ?? nil
         if serviceRows == nil,
-           let series = try container.decodeIfPresent(AdminLabelledSeries.self, forKey: .top_services),
+           let series = (try? container.decodeIfPresent(AdminLabelledSeries.self, forKey: .top_services)) ?? nil,
            let labels = series.labels, let data = series.data {
             serviceRows = zip(labels, data).map { AdminByServiceRow(service: $0, revenue: Int($1), orders: nil) }
         }
         byService = serviceRows
-        var statusRows = try container.decodeIfPresent([AdminByStatusRow].self, forKey: .by_status)
+        subscriptionsByService = (try? container.decodeIfPresent([AdminSubsByServiceRow].self, forKey: .subscriptions_by_service)) ?? nil
+        subscriptionsByStatus = (try? container.decodeIfPresent([AdminByStatusRow].self, forKey: .subscriptions_by_status)) ?? nil
+        ticketsByStatus = (try? container.decodeIfPresent([AdminByStatusRow].self, forKey: .tickets_by_status)) ?? nil
+        notes = (try? container.decodeIfPresent([String].self, forKey: .notes)) ?? nil
+        var statusRows = subscriptionsByStatus
+            ?? ((try? container.decodeIfPresent([AdminByStatusRow].self, forKey: .by_status)) ?? nil)
         if statusRows == nil,
-           let series = try container.decodeIfPresent(AdminLabelledSeries.self, forKey: .status),
+           let series = (try? container.decodeIfPresent(AdminLabelledSeries.self, forKey: .status)) ?? nil,
            let labels = series.labels, let data = series.data {
-            statusRows = zip(labels, data).map { AdminByStatusRow(status: $0, count: Int($1), revenue: nil) }
+            // Legacy "status" extras are SUPPORT TICKETS by status,
+            // not subscriptions: keep them under tickets, never
+            // present them as subscription statuses.
+            ticketsByStatus = zip(labels, data).map { AdminByStatusRow(status: $0, count: Int($1), revenue: nil) }
         }
         byStatus = statusRows
         if let churnValue = try? container.decodeIfPresent(AdminChurn.self, forKey: .churn) {
@@ -465,23 +526,26 @@ struct AdminAnalyticsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && response == nil {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading analytics")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        AdminSkeletonKPIGrid()
+                        AdminSkeletonView(lines: 4, title: "Loading analytics")
+                    }
+                    .psScreenPadding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let errorMessage, response == nil {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -504,9 +568,12 @@ struct AdminAnalyticsRootView: View {
                 }
                 totalsSection
                 revenueSection
+                subscriptionsByServiceSection
                 byServiceSection
                 byStatusSection
+                ticketsByStatusSection
                 churnSection
+                notesSection
                 exportSection
                 if let exportError {
                     Text(exportError)
@@ -551,39 +618,43 @@ struct AdminAnalyticsRootView: View {
     }
 
     private var totalsSection: some View {
-        HStack(spacing: 12) {
-            PSCard {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Revenue")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                    if let revenue = response?.totals?.revenue {
-                        Text("KES \(revenue)")
-                            .font(.psHeadline)
-                    } else {
-                        Text("Not available yet")
-                            .font(.psBody)
-                            .foregroundStyle(.psMuted)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            PSCard {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Orders")
-                        .font(.psCaption)
-                        .foregroundStyle(.psMuted)
-                    if let orders = response?.totals?.orders {
-                        Text("\(orders)")
-                            .font(.psHeadline)
-                    } else {
-                        Text("Not available yet")
-                            .font(.psBody)
-                            .foregroundStyle(.psMuted)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        AdminKPIGrid {
+            AdminKPITile(
+                label: "Revenue in range",
+                value: response?.rangeRevenue.map { "KES \($0)" },
+                systemImage: "banknote.fill",
+                tint: .psPrimary
+            )
+            AdminKPITile(
+                label: "Orders in range",
+                value: response?.rangeOrders.map { "\($0)" },
+                systemImage: "tray.fill",
+                tint: .psCyan
+            )
+            AdminKPITile(
+                label: "Revenue this month",
+                value: response?.totals?.revenueThisMonth.map { "KES \($0)" },
+                systemImage: "calendar",
+                tint: .psSuccess
+            )
+            AdminKPITile(
+                label: "Active subscriptions",
+                value: response?.totals?.activeSubs.map { "\($0)" },
+                systemImage: "checkmark.circle.fill",
+                tint: .psSuccess
+            )
+            AdminKPITile(
+                label: "Total revenue",
+                value: response?.totals?.revenue.map { "KES \($0)" },
+                systemImage: "chart.bar.fill",
+                tint: .psPrimary
+            )
+            AdminKPITile(
+                label: "Users",
+                value: response?.totals?.users.map { "\($0)" },
+                systemImage: "person.2.fill",
+                tint: .psCyan
+            )
         }
     }
 
@@ -633,6 +704,29 @@ struct AdminAnalyticsRootView: View {
         }
     }
 
+    private var subscriptionsByServiceSection: some View {
+        PSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PSSectionHeader(title: "Subscriptions by service")
+                if let rows = response?.subscriptionsByService {
+                    if rows.isEmpty {
+                        Text("No subscriptions by service yet.")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
+                    ForEach(rows) { row in
+                        AdminKVRow(
+                            label: "\(row.service) (\(row.activeCount ?? 0) active)",
+                            value: "\(row.count)"
+                        )
+                    }
+                } else {
+                    AdminUnavailableText()
+                }
+            }
+        }
+    }
+
     private var byServiceSection: some View {
         PSCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -646,13 +740,46 @@ struct AdminAnalyticsRootView: View {
                     ForEach(rows, id: \.service_requested) { row in
                         AdminKVRow(
                             label: "\(row.service_requested ?? "Service") (\(row.orders ?? 0) orders)",
-                            value: "KES \(row.revenue ?? 0)"
+                            value: row.revenue.map { "KES \($0)" } ?? "Not available yet"
                         )
                     }
                 } else {
-                    Text("Not available yet")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                    AdminUnavailableText()
+                }
+            }
+        }
+    }
+
+    private var ticketsByStatusSection: some View {
+        PSCard {
+            VStack(alignment: .leading, spacing: 12) {
+                PSSectionHeader(title: "Support tickets by status")
+                if let rows = response?.ticketsByStatus {
+                    if rows.isEmpty {
+                        Text("No support tickets yet.")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                    }
+                    ForEach(rows) { row in
+                        AdminKVRow(label: row.status, value: "\(row.count)")
+                    }
+                } else {
+                    AdminUnavailableText()
+                }
+            }
+        }
+    }
+
+    private var notesSection: some View {
+        Group {
+            if let notes = response?.notes, !notes.isEmpty {
+                PSCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        PSSectionHeader(title: "Notes from the server")
+                        ForEach(notes, id: \.self) { note in
+                            AdminNoteText(text: note)
+                        }
+                    }
                 }
             }
         }
@@ -662,7 +789,7 @@ struct AdminAnalyticsRootView: View {
         PSCard {
             VStack(alignment: .leading, spacing: 12) {
                 PSSectionHeader(title: "Subscriptions by status")
-                if let rows = response?.byStatus {
+                if let rows = response?.byStatus ?? response?.subscriptionsByStatus {
                     if rows.isEmpty {
                         Text("No subscriptions by status yet.")
                             .font(.psBody)
@@ -675,9 +802,7 @@ struct AdminAnalyticsRootView: View {
                         )
                     }
                 } else {
-                    Text("Not available yet")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                    AdminUnavailableText()
                 }
             }
         }
@@ -751,8 +876,21 @@ struct AdminAnalyticsRootView: View {
         }
     }
 
+    private var cacheKey: String {
+        let trimmedService = serviceFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "analytics-\(days)-\(statusFilter)-\(trimmedService)"
+    }
+
     private func load() async {
         guard appState.isAdminLoggedIn else { return }
+        // Cache first: show the last good analytics immediately,
+        // then refresh live. The cached copy is only shown while
+        // the live refresh runs.
+        if let cached = AdminCache.load(key: cacheKey),
+           let decoded = try? JSONDecoder().decode(AdminAnalyticsResponse.self, from: cached),
+           decoded.ok {
+            response = decoded
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -765,15 +903,19 @@ struct AdminAnalyticsRootView: View {
             query += "&service=\(trimmedService.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmedService)"
         }
         do {
-            var result: AdminAnalyticsResponse = try await APIClient.shared.fetchJSON(query)
+            let data = try await APIClient.shared.fetchData(query)
+            var result = try JSONDecoder().decode(AdminAnalyticsResponse.self, from: data)
             guard result.ok else {
-                errorMessage = "Admin needs the live API. The analytics endpoint did not return data."
+                if response == nil {
+                    errorMessage = "Admin needs the live API. The analytics endpoint did not return data."
+                }
                 return
             }
-            // The older backend keeps revenue by service only in the
-            // financial engine, not in analytics: fill it from there
-            // so the section shows real numbers instead of
-            // "Not available yet" when the data does exist.
+            AdminCache.save(data, key: cacheKey)
+            // Revenue by service lives in the financial engine on
+            // older backends: fill it from there so the section
+            // shows real numbers instead of "Not available yet"
+            // when the data does exist.
             if result.byService == nil,
                let engine: AdminFinancialEngineResponse = try? await APIClient.shared.fetchJSON("api/v1/admin/financial-engine"),
                engine.ok {
@@ -781,7 +923,11 @@ struct AdminAnalyticsRootView: View {
             }
             response = result
         } catch {
-            errorMessage = error.localizedDescription
+            if response == nil {
+                errorMessage = error.localizedDescription
+            } else {
+                errorMessage = "Live refresh failed: \(error.localizedDescription). Showing the last saved analytics."
+            }
         }
     }
 
@@ -878,23 +1024,26 @@ struct AdminFinancialEngineView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && response == nil {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading financial engine")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        AdminSkeletonKPIGrid()
+                        AdminSkeletonView(lines: 3, title: "Loading financial engine")
+                    }
+                    .psScreenPadding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .scrollIndicators(.hidden)
+                .adminFullScreenFrame()
             } else if let errorMessage {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
                 }
                 .psScreenPadding()
+                .adminFullScreenFrame()
             } else {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Financial engine")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
@@ -905,11 +1054,11 @@ struct AdminFinancialEngineView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 if let response {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        engineCard(label: "Total revenue", value: "KES \(response.total_revenue ?? 0)")
-                        engineCard(label: "Revenue this month", value: "KES \(response.revenue_this_month ?? 0)")
-                        engineCard(label: "Ledger entries", value: "\(response.ledger_entries ?? 0)")
-                        engineCard(label: "Wallet balances", value: "KES \(response.total_wallet_balances ?? 0)")
+                    AdminKPIGrid {
+                        AdminKPITile(label: "Total revenue", value: response.total_revenue.map { "KES \($0)" }, systemImage: "banknote.fill", tint: .psPrimary)
+                        AdminKPITile(label: "Revenue this month", value: response.revenue_this_month.map { "KES \($0)" }, systemImage: "calendar", tint: .psSuccess)
+                        AdminKPITile(label: "Ledger entries", value: response.ledger_entries.map { "\($0)" }, systemImage: "list.bullet", tint: .psCyan)
+                        AdminKPITile(label: "Wallet balances", value: response.total_wallet_balances.map { "KES \($0)" }, systemImage: "wallet.bifold.fill", tint: .psCyan)
                     }
                     PSCard {
                         VStack(alignment: .leading, spacing: 12) {
@@ -923,7 +1072,7 @@ struct AdminFinancialEngineView: View {
                             ForEach(rows, id: \.service_requested) { row in
                                 AdminKVRow(
                                     label: "\(row.service_requested ?? "Service") (\(row.orders ?? 0) orders)",
-                                    value: "KES \(row.revenue ?? 0)"
+                                    value: row.revenue.map { "KES \($0)" } ?? "Not available yet"
                                 )
                             }
                         }
@@ -950,20 +1099,6 @@ struct AdminFinancialEngineView: View {
             .psScreenPadding()
         }
         .scrollIndicators(.hidden)
-    }
-
-    private func engineCard(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(.psCaption)
-                .foregroundStyle(.psMuted)
-            Text(value)
-                .font(.psHeadline)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func load() async {

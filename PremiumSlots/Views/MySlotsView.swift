@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - My Slots, v5
+// MARK: - My Slots, v5 (v6: cache-first + skeletons + card actions)
 // Complete overhaul: bigger slot cards (large platform logo, name,
 // price, status pill, expiry plus days remaining), more detail per
 // slot (start date, renewal date, auto-renew state, support
@@ -14,37 +14,69 @@ import SwiftUI
 // negative. There is no customer cancel endpoint on the API, so no
 // Cancel button was invented.
 //
+// v6 loading: the screen never starts blank. Skeleton cards show
+// immediately on a first load, the last good subscriptions are
+// restored from an on-device cache first (UserDefaults, this
+// device only), and the live list refreshes over them. A failed
+// refresh keeps the cached list on screen with a retry banner
+// instead of wiping it, and only a first load with nothing cached
+// shows the full error state with retry.
+//
+// v6 actions: "Request review of credentials" and the auto-renew
+// toggle live on the slot card itself for Active slots as well as
+// in the detail sheet. Both call the real endpoints (request-review
+// via APIClient.requestReview, auto-renew via
+// APIClient.toggleAutoRenew) with loading, success and error
+// states. The toggle and the review state read days_remaining,
+// auto_renew and review_requested straight from the subscriptions
+// response, so they work even when the server extras call is
+// absent. A slot whose review was already requested shows that
+// state instead of a live button.
+//
 // Safe area: the screen lives in a NavigationStack with an inline
 // title, so content starts below the notch and Dynamic Island on
 // first appearance and only scrolls under the bar once the user
 // scrolls. The navigation bar background is an opaque brand colour
 // so scrolled content never shows through behind the notch. No
-// ignoresSafeArea is used on this screen.
+// ignoresSafeArea is used on this screen. The background colour
+// extends edge to edge under the tab bar through psScreenBackground.
 
 struct MySlotsView: View {
     @EnvironmentObject private var appState: AppState
     var onBrowseCatalogue: () -> Void = {}
+    var deepLinkSubscriptionId: Binding<Int?> = .constant(nil)
 
     @State private var showAuth = false
     @State private var vault = ""
     @State private var vaultError = ""
     @State private var revealingId: Int?
     @State private var loadError: String?
+    @State private var isLoading = false
     @State private var actionError: String?
     @State private var selectedSubscription: LiveSubscription?
-    @State private var extras: [Int: PSSubscriptionExtras] = [:]
+    @State private var extras: [Int: MySlotState] = [:]
+    @State private var cachedSubs: [LiveSubscription] = []
     @State private var reportedIds: Set<Int> = []
+    @State private var togglingIds: Set<Int> = []
+    @State private var requestingReviewIds: Set<Int> = []
+    @State private var pendingDisableSub: LiveSubscription?
+
+    /// Live list when present, otherwise the last good cached list.
+    /// The cached list is only ever shown while signed in.
+    private var displaySubs: [LiveSubscription] {
+        appState.liveSubscriptions.isEmpty ? cachedSubs : appState.liveSubscriptions
+    }
 
     private var activeSubs: [LiveSubscription] {
-        appState.liveSubscriptions.filter { $0.status == "Approved" }
+        displaySubs.filter { $0.status == "Approved" }
     }
 
     private var pendingSubs: [LiveSubscription] {
-        appState.liveSubscriptions.filter { $0.status == "Pending" || $0.status == "Initiated" }
+        displaySubs.filter { $0.status == "Pending" || $0.status == "Initiated" }
     }
 
     private var pastSubs: [LiveSubscription] {
-        appState.liveSubscriptions.filter { $0.status != "Approved" && $0.status != "Pending" && $0.status != "Initiated" }
+        displaySubs.filter { $0.status != "Approved" && $0.status != "Pending" && $0.status != "Initiated" }
     }
 
     var body: some View {
@@ -55,13 +87,20 @@ struct MySlotsView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                } else if let loadError {
+                } else if isLoading && displaySubs.isEmpty && appState.orders.isEmpty && loadError == nil {
+                    Section {
+                        PSSkeletonRows(count: 3)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                } else if let loadError, displaySubs.isEmpty && appState.orders.isEmpty {
                     PSErrorState(message: loadError) {
                         Task { await load() }
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                } else if appState.liveSubscriptions.isEmpty && appState.orders.isEmpty {
+                } else if displaySubs.isEmpty && appState.orders.isEmpty {
                     PSEmptyState(
                         systemImage: "lock.shield",
                         title: "No slots yet",
@@ -72,6 +111,24 @@ struct MySlotsView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 } else {
+                    if let loadError {
+                        Section {
+                            HStack(spacing: 10) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.psWarning)
+                                    .accessibilityHidden(true)
+                                Text("Showing your saved slots. The latest list could not be loaded.")
+                                    .psTextStyle(.caption)
+                                    .foregroundStyle(.psMuted)
+                                Spacer()
+                                Button("Retry") {
+                                    Task { await load() }
+                                }
+                                .psTextStyle(.caption)
+                            }
+                        }
+                        .listRowBackground(Color.psSurface)
+                    }
                     if !activeSubs.isEmpty {
                         Section("Active") {
                             ForEach(activeSubs) { sub in
@@ -129,7 +186,7 @@ struct MySlotsView: View {
             .psHiddenScrollIndicators()
             .scrollContentBackground(.hidden)
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("My Slots")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.psBackground, for: .navigationBar)
@@ -139,6 +196,9 @@ struct MySlotsView: View {
             }
             .refreshable { await load() }
             .task { await load() }
+            .onChange(of: deepLinkSubscriptionId.wrappedValue) { _, newId in
+                openDeepLink(id: newId)
+            }
             .sheet(isPresented: $showAuth) {
                 AuthView()
                     .psSheetDetents()
@@ -148,11 +208,10 @@ struct MySlotsView: View {
                     subscription: sub,
                     extras: extras[sub.id],
                     onAutoRenewChanged: { value in
-                        extras[sub.id] = PSSubscriptionExtras(
-                            id: sub.id,
-                            days_remaining: extras[sub.id]?.days_remaining,
-                            auto_renew: value
-                        )
+                        updateAutoRenewState(subId: sub.id, value: value)
+                    },
+                    onReviewRequested: {
+                        updateReviewRequested(subId: sub.id)
                     }
                 )
                 .psSheetDetents()
@@ -173,20 +232,99 @@ struct MySlotsView: View {
             } message: {
                 Text(actionError ?? "")
             }
+            .alert("Turn off auto-renew?", isPresented: Binding(
+                get: { pendingDisableSub != nil },
+                set: { if !$0 { pendingDisableSub = nil } }
+            )) {
+                Button("Turn off auto-renew", role: .destructive) {
+                    if let sub = pendingDisableSub {
+                        Task { await applyAutoRenew(sub: sub, enable: false) }
+                    }
+                    pendingDisableSub = nil
+                }
+                Button("Keep it on", role: .cancel) { pendingDisableSub = nil }
+            } message: {
+                Text("Your slot will expire on the renewal date and will not renew. You can turn auto-renew back on any time before then.")
+            }
             .safeAreaPadding(.bottom, 8)
         }
     }
 
+    // MARK: - Loading, cache first
+
     private func load() async {
+        guard appState.isLoggedIn else {
+            cachedSubs = []
+            return
+        }
+        if displaySubs.isEmpty {
+            restoreCache()
+        }
+        isLoading = true
         loadError = nil
-        await appState.refreshMySubscriptions()
-        await appState.refreshWallet()
+        defer { isLoading = false }
         do {
-            extras = try await appState.api.mySubscriptionExtras()
+            let apiSubs = try await appState.api.mySubscriptions()
+            let fresh = apiSubs.map(LiveSubscription.init)
+            var states: [Int: MySlotState] = [:]
+            for api in apiSubs {
+                states[api.id] = MySlotState(api)
+            }
+            await MainActor.run {
+                appState.liveSubscriptions = fresh
+                extras = states
+            }
+            cachedSubs = fresh
+            saveCache(fresh, states: states)
+            loadError = nil
         } catch {
-            extras = [:]
+            // Keep whatever is on screen (cached list or nothing).
+            // The full error state shows only when there is nothing
+            // to show; otherwise the retry banner above the list
+            // shows, so a flaky refresh never wipes the screen.
+            loadError = error.localizedDescription
+        }
+        await appState.refreshWallet()
+        openDeepLinkIfReady()
+    }
+
+    /// Open the deep-linked subscription once it is on screen.
+    private func openDeepLinkIfReady() {
+        openDeepLink(id: deepLinkSubscriptionId.wrappedValue)
+    }
+
+    private func openDeepLink(id: Int?) {
+        guard let id else { return }
+        guard let sub = displaySubs.first(where: { $0.id == id }) else { return }
+        selectedSubscription = sub
+        deepLinkSubscriptionId.wrappedValue = nil
+    }
+
+    // MARK: - On-device cache (this device only, never faked data)
+
+    private static let cacheKey = "premiumslots.myslots.cache.v1"
+
+    private func restoreCache() {
+        guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
+              let items = try? JSONDecoder().decode([MySlotCacheItem].self, from: data) else {
+            return
+        }
+        cachedSubs = items.map { $0.liveSubscription }
+        var states: [Int: MySlotState] = [:]
+        for item in items {
+            states[item.id] = item.state
+        }
+        extras = states
+    }
+
+    private func saveCache(_ subs: [LiveSubscription], states: [Int: MySlotState]) {
+        let items = subs.map { MySlotCacheItem(sub: $0, state: states[$0.id]) }
+        if let data = try? JSONEncoder().encode(items) {
+            UserDefaults.standard.set(data, forKey: Self.cacheKey)
         }
     }
+
+    // MARK: - Per-slot state helpers
 
     /// Server days remaining when the API returns it, otherwise the
     /// local day difference from the expiry date. Nil when there is
@@ -197,6 +335,27 @@ struct MySlotsView: View {
 
     private func autoRenew(for sub: LiveSubscription) -> Bool? {
         extras[sub.id]?.auto_renew
+    }
+
+    private func reviewRequested(for sub: LiveSubscription) -> Bool {
+        extras[sub.id]?.review_requested == true
+    }
+
+    private func updateAutoRenewState(subId: Int, value: Bool) {
+        if extras[subId] == nil {
+            extras[subId] = MySlotState(id: subId, days_remaining: nil, auto_renew: value, review_requested: nil)
+        } else {
+            extras[subId]?.auto_renew = value
+        }
+    }
+
+    private func updateReviewRequested(subId: Int) {
+        if extras[subId] == nil {
+            extras[subId] = MySlotState(id: subId, days_remaining: nil, auto_renew: nil, review_requested: true)
+        } else {
+            extras[subId]?.review_requested = true
+        }
+        saveCache(displaySubs, states: extras)
     }
 
     private var loginGate: some View {
@@ -276,6 +435,8 @@ struct MySlotsView: View {
                     .psPrimary()
                     .disabled(revealingId != nil)
                     .accessibilityLabel("Show vault details for \(sub.serviceRequested)")
+                    autoRenewRow(for: sub)
+                    reviewRow(for: sub)
                     HStack(spacing: 10) {
                         if reportedIds.contains(sub.id) || sub.issueReported {
                             Label("Issue reported", systemImage: "checkmark.circle.fill")
@@ -348,6 +509,70 @@ struct MySlotsView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Auto-renew toggle on the card, for Active slots only. Shown
+    /// only when the server reported the current state; turning it
+    /// off asks for confirmation with a destructive button.
+    @ViewBuilder
+    private func autoRenewRow(for sub: LiveSubscription) -> some View {
+        if let renew = autoRenew(for: sub) {
+            HStack {
+                Label("Auto-renew", systemImage: "arrow.triangle.2.circlepath")
+                    .psTextStyle(.body)
+                Spacer()
+                if togglingIds.contains(sub.id) {
+                    PSRingSpinner(diameter: 20, lineWidth: 2, duration: 0.7)
+                } else {
+                    Toggle("", isOn: autoRenewCardBinding(for: sub, current: renew))
+                        .labelsHidden()
+                        .accessibilityLabel("Auto-renew for \(sub.serviceRequested), currently \(renew ? "on" : "off")")
+                }
+            }
+        }
+    }
+
+    private func autoRenewCardBinding(for sub: LiveSubscription, current: Bool) -> Binding<Bool> {
+        Binding(
+            get: { autoRenew(for: sub) ?? current },
+            set: { newValue in
+                if newValue {
+                    Task { await applyAutoRenew(sub: sub, enable: true) }
+                } else {
+                    pendingDisableSub = sub
+                }
+            }
+        )
+    }
+
+    /// Request-review row on the card, for Active slots only. After
+    /// a successful request it reads "Review requested" and the
+    /// button is gone, so the same slot cannot be requested twice
+    /// by accident.
+    @ViewBuilder
+    private func reviewRow(for sub: LiveSubscription) -> some View {
+        if reviewRequested(for: sub) {
+            Label("Review requested", systemImage: "checkmark.circle.fill")
+                .psTextStyle(.caption)
+                .foregroundStyle(.psMuted)
+        } else {
+            Button {
+                Task { await requestReview(for: sub) }
+            } label: {
+                if requestingReviewIds.contains(sub.id) {
+                    PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7)
+                } else {
+                    Label("Request a review of credentials", systemImage: "star.fill")
+                        .psTextStyle(.caption)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(.psCyan)
+            .disabled(requestingReviewIds.contains(sub.id))
+            .accessibilityLabel("Request a review of credentials for \(sub.serviceRequested)")
         }
     }
 
@@ -473,12 +698,132 @@ struct MySlotsView: View {
             actionError = error.localizedDescription
         }
     }
+
+    private func applyAutoRenew(sub: LiveSubscription, enable: Bool) async {
+        togglingIds.insert(sub.id)
+        defer { togglingIds.remove(sub.id) }
+        do {
+            let value = try await APIClient.shared.toggleAutoRenew(subscriptionId: sub.id)
+            updateAutoRenewState(subId: sub.id, value: value)
+            saveCache(displaySubs, states: extras)
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func requestReview(for sub: LiveSubscription) async {
+        requestingReviewIds.insert(sub.id)
+        defer { requestingReviewIds.remove(sub.id) }
+        do {
+            try await APIClient.shared.requestReview(subscriptionId: sub.id)
+            updateReviewRequested(subId: sub.id)
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
 }
 
-// MARK: - Subscription detail sheet (timeline + request-review, Fix #4;
+// MARK: - Per-subscription server state (from /me/subscriptions)
+// The subscriptions response itself carries days_remaining,
+// auto_renew and review_requested (optional on older backends).
+// Reading them here, instead of a second extras call, is what
+// makes the auto-renew toggle and the review state actually
+// appear: the old extras call returned nil for both on the
+// current backend, so the toggle was hidden behind
+// "Not available yet" on almost every slot.
+
+struct MySlotState: Decodable {
+    let id: Int
+    var days_remaining: Int?
+    var auto_renew: Bool?
+    var review_requested: Bool?
+
+    init(id: Int, days_remaining: Int?, auto_renew: Bool?, review_requested: Bool?) {
+        self.id = id
+        self.days_remaining = days_remaining
+        self.auto_renew = auto_renew
+        self.review_requested = review_requested
+    }
+
+    init(_ api: APISubscription) {
+        self.id = api.id
+        self.days_remaining = api.days_remaining
+        self.auto_renew = api.auto_renew
+        self.review_requested = api.review_requested
+    }
+}
+
+/// One cached subscription, for the on-device cache only. Built
+/// from the live API values, never from invented data.
+struct MySlotCacheItem: Codable {
+    let id: Int
+    let serviceRequested: String
+    let amountDue: Int
+    let mpesaCode: String?
+    let status: String
+    let expiryDate: String?
+    let issueReported: Bool
+    let accountGroup: String?
+    let lockedPrice: Int?
+    let createdAt: String?
+    let daysRemaining: Int?
+    let autoRenew: Bool?
+    let reviewRequested: Bool?
+
+    init(sub: LiveSubscription, state: MySlotState?) {
+        self.id = sub.id
+        self.serviceRequested = sub.serviceRequested
+        self.amountDue = sub.amountDue
+        self.mpesaCode = sub.mpesaCode
+        self.status = sub.status
+        self.expiryDate = sub.expiryDate
+        self.issueReported = sub.issueReported
+        self.accountGroup = sub.accountGroup
+        self.lockedPrice = sub.lockedPrice
+        self.createdAt = sub.createdAt
+        self.daysRemaining = state?.days_remaining
+        self.autoRenew = state?.auto_renew
+        self.reviewRequested = state?.review_requested
+    }
+
+    var state: MySlotState {
+        MySlotState(
+            id: id,
+            days_remaining: daysRemaining,
+            auto_renew: autoRenew,
+            review_requested: reviewRequested
+        )
+    }
+
+    var liveSubscription: LiveSubscription {
+        LiveSubscription(APISubscription(
+            id: id,
+            service_requested: serviceRequested,
+            amount_due: amountDue,
+            mpesa_code: mpesaCode,
+            delivery_type: nil,
+            status: status,
+            expiry_date: expiryDate,
+            viewed: nil,
+            issue_reported: issueReported,
+            account_group: accountGroup,
+            locked_price: lockedPrice,
+            created_at: createdAt,
+            days_remaining: daysRemaining,
+            auto_renew: autoRenew,
+            review_requested: reviewRequested,
+            customer_name: nil,
+            customer_whatsapp: nil,
+            customer_email: nil
+        ))
+    }
+}
+
+// MARK: - Subscription detail sheet (timeline + request-review;
 // v5: start/renewal dates, auto-renew toggle, support actions)
 // Timeline from GET /api/v1/me/subscriptions/<id>/timeline (OrderEvents);
-// request-review via POST /api/v1/me/subscriptions/<id>/request-review.
+// request-review via APIClient.requestReview
+// (POST /api/v1/me/subscriptions/<id>/request-review).
 // Auto-renew uses POST /api/v1/subscription/<id>/toggle-auto-renew,
 // which flips the server flag and returns the new value. The toggle
 // is shown only when the server reported the current state; turning
@@ -487,8 +832,9 @@ struct MySlotsView: View {
 
 struct SubscriptionDetailSheet: View {
     let subscription: LiveSubscription
-    let extras: PSSubscriptionExtras?
+    let extras: MySlotState?
     var onAutoRenewChanged: ((Bool) -> Void)?
+    var onReviewRequested: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var autoRenewState: Bool?
@@ -500,15 +846,18 @@ struct SubscriptionDetailSheet: View {
     @State private var timelineError: String?
     @State private var reviewMessage: String?
     @State private var isRequestingReview = false
+    @State private var reviewRequested: Bool
     @State private var issueReported: Bool
     @State private var issueMessage: String?
     @State private var isReportingIssue = false
 
-    init(subscription: LiveSubscription, extras: PSSubscriptionExtras? = nil, onAutoRenewChanged: ((Bool) -> Void)? = nil) {
+    init(subscription: LiveSubscription, extras: MySlotState? = nil, onAutoRenewChanged: ((Bool) -> Void)? = nil, onReviewRequested: (() -> Void)? = nil) {
         self.subscription = subscription
         self.extras = extras
         self.onAutoRenewChanged = onAutoRenewChanged
+        self.onReviewRequested = onReviewRequested
         _autoRenewState = State(initialValue: extras?.auto_renew)
+        _reviewRequested = State(initialValue: extras?.review_requested == true)
         _issueReported = State(initialValue: subscription.issueReported)
     }
 
@@ -575,7 +924,7 @@ struct SubscriptionDetailSheet: View {
                     }
                 }
                 Section("Auto-renew") {
-                    if let _ = autoRenewState {
+                    if autoRenewState != nil {
                         Toggle("Auto-renew", isOn: autoRenewBinding)
                             .disabled(isTogglingAutoRenew)
                         Text("When auto-renew is on, your slot renews on the renewal date. When it is off, the slot ends on that date.")
@@ -661,15 +1010,21 @@ struct SubscriptionDetailSheet: View {
                     Text("Ask the team to request a review of this slot.")
                         .psTextStyle(.body)
                         .foregroundStyle(.psMuted)
-                    Button {
-                        Task { await requestReview() }
-                    } label: {
-                        if isRequestingReview { PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7) }
-                        else { Label("Request a review", systemImage: "star.fill") }
+                    if reviewRequested {
+                        Label("Review requested", systemImage: "checkmark.circle.fill")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psMuted)
+                    } else {
+                        Button {
+                            Task { await requestReview() }
+                        } label: {
+                            if isRequestingReview { PSRingSpinner(diameter: 20, lineWidth: 2, color: .psPaper, duration: 0.7) }
+                            else { Label("Request a review", systemImage: "star.fill") }
+                        }
+                        .psPrimary()
+                        .disabled(isRequestingReview)
+                        .accessibilityLabel("Request a review of \(subscription.serviceRequested)")
                     }
-                    .psPrimary()
-                    .disabled(isRequestingReview)
-                    .accessibilityLabel("Request a review of \(subscription.serviceRequested)")
                     if let reviewMessage {
                         Text(reviewMessage)
                             .psTextStyle(.caption)
@@ -769,9 +1124,9 @@ struct SubscriptionDetailSheet: View {
         isRequestingReview = true
         defer { isRequestingReview = false }
         do {
-            let _: APIResponse = try await APIClient.shared.fetchOK(
-                "api/v1/me/subscriptions/\(subscription.id)/request-review",
-                method: "POST", body: [:])
+            try await APIClient.shared.requestReview(subscriptionId: subscription.id)
+            reviewRequested = true
+            onReviewRequested?()
             reviewMessage = "Review requested. Thanks for helping other customers choose."
         } catch {
             reviewMessage = error.localizedDescription

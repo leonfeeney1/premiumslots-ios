@@ -108,7 +108,7 @@ struct DashboardRootView: View {
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                 }
-            } else if let loadError {
+            } else if let loadError, dashboard == nil {
                 Section {
                     PSErrorState(message: loadError) {
                         Task { await load() }
@@ -118,15 +118,34 @@ struct DashboardRootView: View {
                 }
             } else if isLoading && dashboard == nil {
                 Section {
-                    HStack {
-                        Spacer()
-                        PSRingSpinner(diameter: 28, lineWidth: 3)
-                        Spacer()
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
+                    PSSkeletonRows(count: 3)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             } else if let dashboard {
+                // A failed refresh with a dashboard already on
+                // screen shows a small retry banner at the top of
+                // the sections below instead of replacing them.
+                // Only a first load with no dashboard shows the
+                // full error state above.
+                if let loadError {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.psWarning)
+                                .accessibilityHidden(true)
+                            Text("Showing your saved dashboard. The latest data could not be loaded.")
+                                .font(.psCaption)
+                                .foregroundStyle(.psMuted)
+                            Spacer()
+                            Button("Retry") {
+                                Task { await load() }
+                            }
+                            .font(.psCaption)
+                        }
+                    }
+                    .listRowBackground(Color.psSurface)
+                }
                 Section("My subscriptions") {
                     if dashboard.subscriptions.isEmpty {
                         Text("No subscriptions yet. Browse the catalogue to buy your first slot.")
@@ -281,7 +300,7 @@ struct DashboardRootView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .psScreenBackground()
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -348,6 +367,12 @@ struct DashboardRootView: View {
         .psTouchTarget()
     }
 
+    // Each call guards its own failure, so one failing call
+    // cannot fail the whole refresh: the public sections fall
+    // back to the saved catalogue counts, suggestions fall back
+    // to an empty list, and only the signed-in dashboard sets
+    // the error, which the body shows only when no dashboard
+    // is on screen yet.
     private func load() async {
         isLoading = true
         loadError = nil

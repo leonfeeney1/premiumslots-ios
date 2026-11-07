@@ -65,13 +65,15 @@ struct AdminCouponsRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && coupons.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading coupons")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading coupons")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, coupons.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -81,7 +83,7 @@ struct AdminCouponsRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Coupons")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -318,7 +320,7 @@ struct AdminCouponFormSheet: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle(coupon == nil ? "New coupon" : "Edit coupon")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -410,7 +412,7 @@ struct AdminCouponRedemptionsSheet: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Redemptions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -478,7 +480,7 @@ struct AdminCouponBlastSheet: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle("Coupon blast")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -549,13 +551,15 @@ struct AdminBlogRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && posts.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading blog posts")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading blog posts")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, posts.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -565,7 +569,7 @@ struct AdminBlogRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Blog")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -756,7 +760,7 @@ struct AdminBlogFormSheet: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle(post == nil ? "New post" : "Edit post")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -833,13 +837,15 @@ struct AdminHelpRootView: View {
             if !appState.isAdminLoggedIn {
                 AdminNotSignedInView()
             } else if isLoading && articles.isEmpty {
-                VStack(spacing: 12) {
-                    PSRingSpinner(diameter: 40, lineWidth: 4)
-                    Text("Loading help articles")
-                        .font(.psBody)
-                        .foregroundStyle(.psMuted)
+                ScrollView {
+
+                    AdminSkeletonView(lines: 4, title: "Loading help articles")
+
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                .scrollIndicators(.hidden)
+
+                .adminFullScreenFrame()
             } else if let errorMessage, articles.isEmpty {
                 PSErrorState(message: errorMessage) {
                     Task { await load() }
@@ -849,7 +855,7 @@ struct AdminHelpRootView: View {
                 content
             }
         }
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Help articles")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -1029,7 +1035,7 @@ struct AdminHelpFormSheet: View {
                 }
                 .psScreenPadding()
             }
-            .background(Color.psBackground)
+            .adminScreenBackground()
             .navigationTitle(article == nil ? "New article" : "Edit article")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

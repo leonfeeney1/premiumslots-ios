@@ -1,51 +1,78 @@
 import SwiftUI
 
-// MARK: - Home, v5
+// MARK: - Home, v5 (v6: richer hero + resilient refresh)
 // First tab. One clean hero lockup: the real extended lockup only
 // (shield plus wordmark once, in a single image), with a subtle
 // gradient behind it. No second logo beside it and no stray favicon
 // anywhere on Home. Live stats as elegant cards from the catalogue
 // API (platforms, slots in rotation, slots available now), a
-// featured platforms grid with real logos, a 3-step How it works
-// visual, a why section with factual service copy only, and a
-// support section with the real WhatsApp support link. Every number
-// comes from the live API; while loading the ring spinner shows,
-// and on failure an error state with retry shows. No saved or
-// invented numbers are shown as live, and there are no invented
-// quotes or testimonials anywhere on this screen.
+// featured platforms grid with real logos, a going-fast ranking
+// from live stock, a 3-step How it works visual, a why section
+// with factual service copy only, a short FAQ, and a support
+// section with the real WhatsApp support link. Every number comes
+// from the live API; while loading, skeleton shapes show, and on
+// failure an error state with retry shows only when there is
+// nothing to show at all.
+//
+// Refresh (v6): the pull-to-refresh path is resilient. The
+// catalogue call, the subscriptions call and the notification
+// bell each guard their own failure, so one failing call cannot
+// fail the whole refresh. A catalogue that is not live shows the
+// saved catalogue with a small neutral pill, never a
+// "something went wrong" state, while saved or bundled platforms
+// are on screen. The error state appears only on a first load
+// with no platforms at all, and a successful refresh always
+// clears the stale error.
 //
 // Safe area: the screen lives in a NavigationStack with an inline
 // title, so content starts below the notch and Dynamic Island on
 // first appearance and only scrolls under the bar once the user
 // scrolls. The navigation bar background is an opaque brand colour
 // so scrolled content never shows through behind the notch. No
-// ignoresSafeArea is used on this screen.
+// ignoresSafeArea is used on this screen. The background colour
+// extends edge to edge under the tab bar through psScreenBackground.
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
     var onBrowseCatalogue: () -> Void = {}
+    var onOpenMySlots: () -> Void = {}
     var onOpenSupport: () -> Void = {}
 
     @State private var selectedPlatform: Platform?
     @State private var loadError: String?
     @State private var isLoading = false
 
+    /// True only on the very first load, before any catalogue
+    /// (live or saved) has ever been shown.
+    private var isFirstLoad: Bool {
+        isLoading && appState.liveState == .unknown
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     hero
-                    statsSection
-                    featuredSection
-                    howItWorksSection
-                    whyChooseUsSection
-                    supportSection
+                    if let loadError, appState.platforms.isEmpty {
+                        PSErrorState(message: loadError) {
+                            Task { await load() }
+                        }
+                    } else {
+                        statsSection
+                        mySlotsStrip
+                        featuredSection
+                        goingFastSection
+                        howItWorksSection
+                        whyChooseUsSection
+                        faqSection
+                        supportSection
+                    }
                 }
                 .padding(16)
             }
             .psHiddenScrollIndicators()
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.psBackground)
+            .psScreenBackground()
             .navigationTitle("Home")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.psBackground, for: .navigationBar)
@@ -63,13 +90,32 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Loading, resilient per call
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        loadError = nil
+        // Catalogue: refreshCatalogue never throws. It keeps the
+        // saved catalogue and marks the state offline when the API
+        // cannot be reached, so this call alone can never fail the
+        // refresh.
         await appState.refreshCatalogue()
-        if appState.liveState != .live {
+        // Subscriptions: refreshMySubscriptions guards its own
+        // failure internally and keeps the last list, so this call
+        // cannot fail the refresh either.
+        if appState.isLoggedIn {
+            await appState.refreshMySubscriptions()
+        }
+        // Only a first load with no platforms at all is an error.
+        // With saved platforms on screen, the offline pill in the
+        // stats section is the whole story, and a stale error is
+        // always cleared on a successful refresh.
+        if appState.liveState == .live {
+            loadError = nil
+        } else if appState.platforms.isEmpty {
             loadError = "The latest catalogue could not be loaded. Check your connection and try again."
+        } else {
+            loadError = nil
         }
     }
 
@@ -82,6 +128,18 @@ struct HomeView: View {
         return Array((available.isEmpty ? appState.platforms : available).prefix(6))
     }
 
+    /// Lowest stock first: the platforms closest to selling out,
+    /// from live stock only. Scarcity is the honest ranking the
+    /// app can compute without inventing demand.
+    private var goingFastPlatforms: [Platform] {
+        let available = appState.platforms.filter { !$0.isSoldOut }
+        return Array(available.sorted { $0.slotsLeft < $1.slotsLeft }.prefix(3))
+    }
+
+    private var activeSlotCount: Int {
+        appState.liveSubscriptions.filter { $0.status == "Approved" }.count
+    }
+
     private func toggleWaitlist(for platform: Platform) {
         if appState.waitlist.contains(platform.id) {
             appState.leaveWaitlist(platformId: platform.id)
@@ -90,23 +148,46 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Hero: one lockup, once
+    // MARK: - Hero: one lockup, once, richer
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: 14) {
-            LogoLockupView(height: 40)
+            HStack {
+                LogoLockupView(height: 44)
+                Spacer()
+                if appState.liveState == .live {
+                    PSStatusPill(text: "Live catalogue", systemImage: "checkmark.circle.fill", tint: .psSuccess)
+                } else if appState.liveState == .offline {
+                    PSStatusPill(text: "Saved catalogue", systemImage: "wifi.slash", tint: .psMuted)
+                }
+            }
             Text("Shared subscriptions, one slot at a time.")
-                .psTextStyle(.title)
+                .psTextStyle(.largeTitle)
             Text("Premium streaming, music, design and learning accounts, shared fairly. Pay by M-PESA and get your own profile.")
                 .psTextStyle(.body)
                 .foregroundStyle(.psMuted)
-            Button("Browse the catalogue", action: onBrowseCatalogue)
-                .psPrimary()
+            HStack(spacing: 10) {
+                Button("Browse the catalogue", action: onBrowseCatalogue)
+                    .psPrimary()
+                Button("My Slots", action: onOpenMySlots)
+                    .buttonStyle(.bordered)
+                    .tint(.psCyan)
+            }
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield.fill")
+                    .psTextStyle(.caption)
+                    .foregroundStyle(.psCyan)
+                    .accessibilityHidden(true)
+                Text("Secure M-PESA checkout  ·  Instant delivery  ·  Encrypted vault")
+                    .psTextStyle(.caption)
+                    .foregroundStyle(.psMuted)
+            }
+            .accessibilityLabel("Secure M-PESA checkout, instant delivery, encrypted vault")
         }
         .padding(16)
         .background(
             LinearGradient(
-                colors: [Color.psPrimary.opacity(0.14), Color.psSurface],
+                colors: [Color.psPrimary.opacity(0.16), Color.psSurface],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -120,21 +201,11 @@ struct HomeView: View {
 
     // MARK: - Live stats, live data only
 
-    @ViewBuilder
     private var statsSection: some View {
-        if isLoading && appState.liveState != .live {
-            HStack {
-                Spacer()
-                PSRingSpinner(diameter: 32, lineWidth: 3)
-                Spacer()
-            }
-            .padding(.vertical, 24)
-        } else if let loadError, appState.liveState != .live {
-            PSErrorState(message: loadError) {
-                Task { await load() }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            if isFirstLoad {
+                PSSkeletonStats(count: 3)
+            } else {
                 if appState.liveState == .offline {
                     PSOfflineBanner(message: "")
                 }
@@ -174,6 +245,42 @@ struct HomeView: View {
         .accessibilityLabel("\(value) \(label)")
     }
 
+    /// Signed-in strip: your own active slots, from the live list.
+    @ViewBuilder
+    private var mySlotsStrip: some View {
+        if appState.isLoggedIn, !appState.liveSubscriptions.isEmpty {
+            Button(action: onOpenMySlots) {
+                HStack(spacing: 12) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.psIcon)
+                        .foregroundStyle(.psCyan)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("You have \(activeSlotCount) active slot\(activeSlotCount == 1 ? "" : "s")")
+                            .psTextStyle(.headline)
+                        Text("Tap to see your vault details and renewal dates.")
+                            .psTextStyle(.caption)
+                            .foregroundStyle(.psMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.psIconSmall)
+                        .foregroundStyle(.psMuted)
+                        .accessibilityHidden(true)
+                }
+                .padding(14)
+                .background(Color.psSurface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.psBorder, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("You have \(activeSlotCount) active slots. Open My Slots.")
+        }
+    }
+
     // MARK: - Featured platforms, real logos
 
     private var featuredSection: some View {
@@ -181,7 +288,9 @@ struct HomeView: View {
             PSSectionHeader(title: "Featured platforms", actionLabel: "See all") {
                 onBrowseCatalogue()
             }
-            if appState.liveState == .live || !isLoading {
+            if isFirstLoad {
+                PSSkeletonGrid(count: 4)
+            } else {
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 12),
@@ -197,6 +306,58 @@ struct HomeView: View {
                         )
                         .contentShape(Rectangle())
                         .onTapGesture { selectedPlatform = platform }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Going fast, from live stock
+
+    @ViewBuilder
+    private var goingFastSection: some View {
+        if !isFirstLoad, !goingFastPlatforms.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                PSSectionHeader(title: "Going fast")
+                PSCard {
+                    VStack(spacing: 0) {
+                        ForEach(Array(goingFastPlatforms.enumerated()), id: \.element.id) { index, platform in
+                            Button {
+                                selectedPlatform = platform
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text("\(index + 1)")
+                                        .psTextStyle(.headline)
+                                        .foregroundStyle(.psCyan)
+                                        .frame(width: 24)
+                                        .accessibilityHidden(true)
+                                    PlatformLogoView(platform: platform, size: 44)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(platform.name)
+                                            .psTextStyle(.headline)
+                                        Text(platform.formattedPrice + " per slot")
+                                            .psTextStyle(.caption)
+                                            .foregroundStyle(.psMuted)
+                                    }
+                                    Spacer()
+                                    PSStatusPill(
+                                        text: platform.slotsLeft == 1 ? "Last slot" : "\(platform.slotsLeft) left",
+                                        systemImage: "exclamationmark.circle.fill",
+                                        tint: .psAmber
+                                    )
+                                    Image(systemName: "chevron.right")
+                                        .font(.psIconSmall)
+                                        .foregroundStyle(.psMuted)
+                                        .accessibilityHidden(true)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(platform.name), \(platform.formattedPrice) per slot, \(platform.slotsLeft) slots left")
+                            if index < goingFastPlatforms.count - 1 {
+                                Divider()
+                            }
+                        }
                     }
                 }
             }
@@ -312,6 +473,38 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - FAQ teaser
+
+    private var faqSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            PSSectionHeader(title: "Questions")
+            PSCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    DisclosureGroup("How do I pay?") {
+                        Text("Send the exact amount by M-PESA to PayBill 400200, account 1192526, then submit the 10-letter-and-number code from your confirmation message in checkout.")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psDim)
+                    }
+                    .psTextStyle(.headline)
+                    Divider()
+                    DisclosureGroup("When do I get my details?") {
+                        Text("Once the team verifies your code, your slot moves to Active in My Slots and your vault details appear there.")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psDim)
+                    }
+                    .psTextStyle(.headline)
+                    Divider()
+                    DisclosureGroup("Can I use my slot on more than one device?") {
+                        Text("No. 1 slot = 1 device. Use it on your own device only.")
+                            .psTextStyle(.body)
+                            .foregroundStyle(.psDim)
+                    }
+                    .psTextStyle(.headline)
+                }
+            }
+        }
+    }
+
     // MARK: - Support (real WhatsApp channel)
 
     private var supportSection: some View {
@@ -331,6 +524,21 @@ struct HomeView: View {
                 .buttonStyle(.bordered)
                 .tint(.psCyan)
                 .accessibilityLabel("WhatsApp support, \(PSContact.whatsAppDisplayNumber)")
+                HStack(spacing: 16) {
+                    NavigationLink {
+                        TicketsRootView()
+                    } label: {
+                        Label("Support tickets", systemImage: "envelope.fill")
+                            .psTextStyle(.caption)
+                    }
+                    NavigationLink {
+                        HelpRootView()
+                    } label: {
+                        Label("Help centre", systemImage: "questionmark.circle.fill")
+                            .psTextStyle(.caption)
+                    }
+                }
+                .padding(.top, 4)
                 Button("More support options", action: onOpenSupport)
                     .psTextStyle(.caption)
             }

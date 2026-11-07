@@ -101,7 +101,7 @@ struct AccountRootView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -152,7 +152,7 @@ struct AccProfileView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -244,7 +244,7 @@ struct AccPasswordView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Password")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -315,7 +315,7 @@ struct AccPrivacyView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -422,7 +422,7 @@ struct AccSessionsView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Sessions")
         .navigationBarTitleDisplayMode(.inline)
         .scrollIndicators(.hidden)
@@ -498,7 +498,7 @@ struct AccSecurityView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Security")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaPadding(.bottom, 8)
@@ -542,7 +542,7 @@ struct AccDeleteView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Delete account")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -715,7 +715,7 @@ struct AccGDPRView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.psBackground)
+        .adminScreenBackground()
         .navigationTitle("Data and privacy")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
