@@ -95,10 +95,11 @@ import AuthenticationServices
 //      and verify then 404s. The allow list is now passed to the
 //      platform provider when it is non-empty.
 //   2. authenticationPayload used guard let on rawAuthenticatorData
-//      and signature, which are non-Optional Data on
-//      ASAuthorizationPlatformPublicKeyCredentialAssertion. They
-//      are now read directly; only rawAttestationObject on the
-//      registration credential is Optional and keeps a guard.
+//      and signature. In the Xcode 26.6 SDK those two are
+//      Optional Data on ASAuthorizationPlatformPublicKeyCredentialAssertion,
+//      so they keep a guard; rawClientDataJSON is non-Optional and
+//      is read directly, as is rawAttestationObject's counterpart
+//      only after its own guard on the registration credential.
 //   3. The manager was not MainActor-isolated, so
 //      performRequests could run off the main thread. It is now
 //      @MainActor, and the presentation anchor falls back to the
@@ -385,12 +386,14 @@ enum PasskeyWire {
     static func authenticationPayload(
         _ credential: ASAuthorizationPlatformPublicKeyCredentialAssertion
     ) throws -> [String: Any] {
-        // rawAuthenticatorData, signature and rawClientDataJSON are
-        // non-Optional Data on the assertion credential, so they
-        // are read directly. A guard let here would bind a
-        // non-Optional value.
-        let authenticatorData = credential.rawAuthenticatorData
-        let signature = credential.signature
+        // In this SDK rawAuthenticatorData and signature are
+        // Optional Data on the assertion credential, so they
+        // are unwrapped here; rawClientDataJSON is non-Optional
+        // and is read directly.
+        guard let authenticatorData = credential.rawAuthenticatorData,
+              let signature = credential.signature else {
+            throw PasskeyError.missingData("the authenticator data")
+        }
         let clientData = credential.rawClientDataJSON
         var response: [String: Any] = [
             "clientDataJSON": clientData.passkeyBase64URL(),
