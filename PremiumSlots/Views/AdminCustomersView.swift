@@ -40,8 +40,8 @@ struct AdminCustomerRow: Decodable, Identifiable, Equatable {
 
     var isBanned: Bool { is_banned == true }
     var isActive: Bool { is_active ?? !isBanned }
-    var isVIP: Bool { is_vip ?? (loyalty_points ?? 0) >= 750 }
-    var hasWallet: Bool { has_wallet ?? (wallet_balance ?? 0) > 0 }
+    var isVIP: Bool { is_vip ?? ((loyalty_points ?? 0) >= 750) }
+    var hasWallet: Bool { has_wallet ?? ((wallet_balance ?? 0) > 0) }
     var lifetimeValue: Int { ltv ?? total_spent ?? 0 }
 }
 

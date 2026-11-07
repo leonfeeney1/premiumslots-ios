@@ -548,7 +548,7 @@ struct AdminIssueGiftCardSheet: View {
                                 .psTextField()
                             Button("Issue gift card") { Task { await issue() } }
                                 .psPrimary()
-                                .disabled(isWorking || Int(amount) ?? 0 <= 0)
+                                .disabled(isWorking || (Int(amount) ?? 0) <= 0)
                                 .accessibilityLabel("Issue gift card")
                         }
                     }
