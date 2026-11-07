@@ -60,12 +60,12 @@
 		79F53C14AD822858C2024F2E /* PremiumSlots */ = {
 			isa = PBXGroup;
 			children = (
-				CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */,,
-				9C4087EC7559401B3F62CABF /* ContentView.swift */,,
-				DE9D3E379DD97D2A4D79A984 /* Models.swift */,,
-				FCDDEF57AF2A6A4373FEF648 /* Theme.swift */,,
-				8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */,,
-				E66913BB80E2651A821BA7B5 /* Info.plist */,,
+				CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */,
+				9C4087EC7559401B3F62CABF /* ContentView.swift */,
+				DE9D3E379DD97D2A4D79A984 /* Models.swift */,
+				FCDDEF57AF2A6A4373FEF648 /* Theme.swift */,
+				8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */,
+				E66913BB80E2651A821BA7B5 /* Info.plist */,
 				047B8C73919DA3DD55756314 /* Views */ ,
 			);
 			path = PremiumSlots;
@@ -74,12 +74,12 @@
 		047B8C73919DA3DD55756314 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				2D62D1347F6783D1323CE4D2 /* CatalogView.swift */,,
-				2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */,,
-				3FE7CDE0689036A536E1EABF /* CheckoutView.swift */,,
-				3888DBE22CE412ACB94000D2 /* MySlotsView.swift */,,
-				02A4590BAAB972163A79AF15 /* HowItWorksView.swift */,,
-				0F6D196DA7F0108A072F670C /* SettingsView.swift */,,
+				2D62D1347F6783D1323CE4D2 /* CatalogView.swift */,
+				2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */,
+				3FE7CDE0689036A536E1EABF /* CheckoutView.swift */,
+				3888DBE22CE412ACB94000D2 /* MySlotsView.swift */,
+				02A4590BAAB972163A79AF15 /* HowItWorksView.swift */,
+				0F6D196DA7F0108A072F670C /* SettingsView.swift */,
 				152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */,
 			);
 			path = Views;
@@ -162,16 +162,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				585DA461E1DE3AB5136612BE /* PremiumSlotsApp.swift in Sources */,,
-				B8999ECE27D297F020299F66 /* ContentView.swift in Sources */,,
-				3DD78CD055CEA604C926BE9C /* Models.swift in Sources */,,
-				3E31102351BD559C5EC3C189 /* Theme.swift in Sources */,,
-				D57DDEE24B65FA9766C5894F /* CatalogView.swift in Sources */,,
-				2F330915458AD97AC877CEB5 /* PlatformDetailView.swift in Sources */,,
-				28BB04C99D3C4918F70E3E17 /* CheckoutView.swift in Sources */,,
-				D02FB7E024D5CB145E909189 /* MySlotsView.swift in Sources */,,
-				79766E173C8478083C910B49 /* HowItWorksView.swift in Sources */,,
-				33978E4FDFBE6A760B2143B9 /* SettingsView.swift in Sources */,,
+				585DA461E1DE3AB5136612BE /* PremiumSlotsApp.swift in Sources */,
+				B8999ECE27D297F020299F66 /* ContentView.swift in Sources */,
+				3DD78CD055CEA604C926BE9C /* Models.swift in Sources */,
+				3E31102351BD559C5EC3C189 /* Theme.swift in Sources */,
+				D57DDEE24B65FA9766C5894F /* CatalogView.swift in Sources */,
+				2F330915458AD97AC877CEB5 /* PlatformDetailView.swift in Sources */,
+				28BB04C99D3C4918F70E3E17 /* CheckoutView.swift in Sources */,
+				D02FB7E024D5CB145E909189 /* MySlotsView.swift in Sources */,
+				79766E173C8478083C910B49 /* HowItWorksView.swift in Sources */,
+				33978E4FDFBE6A760B2143B9 /* SettingsView.swift in Sources */,
 				D6CA38FAE212EDA9213A31FC /* SlotCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
