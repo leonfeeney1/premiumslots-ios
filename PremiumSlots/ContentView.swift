@@ -20,6 +20,11 @@ struct ContentView: View {
                     Label("How it works", systemImage: "questionmark.circle.fill")
                 }
 
+            AdminView()
+                .tabItem {
+                    Label("Admin", systemImage: "person.badge.key.fill")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")

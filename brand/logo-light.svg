@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" width="100%" height="100%" fill="none" preserveAspectRatio="xMinYMid meet">
+  <defs>
+    <!-- Glow & Shadow Filters -->
+    <filter id="lightGlow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0284C7" flood-opacity="0.25" />
+    </filter>
+    <filter id="subtleTextShadow" x="-10%" y="-10%" width="120%" height="120%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000000" flood-opacity="0.1" />
+    </filter>
+
+    <!-- Color Gradients -->
+    <linearGradient id="brandGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="35%" stop-color="#0284C7" />
+      <stop offset="75%" stop-color="#0369A1" />
+      <stop offset="100%" stop-color="#0C4A6E" />
+    </linearGradient>
+
+    <linearGradient id="cyanGradLight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284C7" />
+      <stop offset="50%" stop-color="#0369A1" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <linearGradient id="darkTextGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="60%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#334155" />
+    </linearGradient>
+
+    <linearGradient id="shieldGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="50%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <linearGradient id="borderGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#38BDF8" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0.9" />
+    </linearGradient>
+
+    <radialGradient id="haloRadialLight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0284C7" stop-opacity="0.22" />
+      <stop offset="70%" stop-color="#0284C7" stop-opacity="0.04" />
+      <stop offset="100%" stop-color="#0284C7" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <style>
+    .brand-title-light {
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-weight: 800;
+      font-size: 32px;
+      letter-spacing: -0.5px;
+    }
+    .brand-subtitle-light {
+      font-family: 'JetBrains Mono', 'Archivo', 'SF Pro Display', monospace;
+      font-weight: 700;
+      font-size: 8.5px;
+      letter-spacing: 3.2px;
+      text-transform: uppercase;
+    }
+  </style>
+
+  <!-- Soft Ambient Glow Behind Emblem -->
+  <circle cx="32" cy="32" r="30" fill="url(#haloRadialLight)" />
+
+  <!-- EMBLEM ICON (Left Anchor: 52x52) -->
+  <g transform="translate(6, 6)">
+    <!-- Base Rounded Shield Frame -->
+    <rect x="0" y="0" width="52" height="52" rx="15" fill="url(#shieldGradLight)" stroke="url(#borderGradLight)" stroke-width="1.8" />
+    
+    <!-- Inner Rim Accent -->
+    <rect x="2.5" y="2.5" width="47" height="47" rx="12.5" fill="none" stroke="#38BDF8" stroke-opacity="0.25" stroke-width="1" />
+
+    <!-- Stylized Geometric 'P' -->
+    <path d="M 15 13 C 15 12.2 15.6 11.5 16.4 11.5 L 24.5 11.5 C 32 11.5 37 15.5 37 22.5 C 37 29 32 33.5 24.5 33.5 L 21 33.5 L 21 39.5 C 21 40.3 20.3 41 19.5 41 L 16.4 41 C 15.6 41 15 40.3 15 39.5 Z" 
+          fill="url(#brandGradLight)" filter="url(#lightGlow)" />
+
+    <!-- Inner 'P' Cutout -->
+    <path d="M 21 16.5 L 24 16.5 C 28.5 16.5 31.5 18.5 31.5 22.5 C 31.5 26.2 28.5 28.5 24 28.5 L 21 28.5 Z" 
+          fill="#0B131E" />
+
+    <!-- Angular Slot Energy Tab -->
+    <path d="M 25 32 L 35.5 21.5 C 36.3 20.7 37.8 21.3 37.8 22.5 L 37.8 36 C 37.8 36.8 37.2 37.5 36.4 37.5 L 26.5 37.5 C 25.2 37.5 24.5 36 25 35 Z" 
+          fill="url(#cyanGradLight)" opacity="0.95" />
+
+    <!-- 3 Glowing Digital Slot Level Indicators -->
+    <rect x="41" y="17" width="2.5" height="5" rx="1.25" fill="#38BDF8" opacity="0.95" />
+    <rect x="41" y="24" width="2.5" height="5" rx="1.25" fill="#0284C7" opacity="0.85" />
+    <rect x="41" y="31" width="2.5" height="5" rx="1.25" fill="#0C4A6E" opacity="0.65" />
+
+    <!-- Crown Sparkle Star -->
+    <path d="M 40 9 L 41.5 12.5 L 45 14 L 41.5 15.5 L 40 19 L 38.5 15.5 L 35 14 L 38.5 12.5 Z" 
+          fill="#FFFFFF" filter="url(#lightGlow)" />
+  </g>
+
+  <!-- LOGO TYPOGRAPHY (Single Word Lockup: Premium in Dark Obsidian, Slots in Electric Blue) -->
+  <text x="70" y="37" class="brand-title-light">
+    <tspan fill="url(#darkTextGrad)">Premium</tspan><tspan fill="url(#cyanGradLight)">Slots</tspan>
+  </text>
+
+  <!-- Subtitle Tagline Badge -->
+  <g transform="translate(71, 51)">
+    <circle cx="2" cy="3.5" r="2" fill="#0284C7" />
+    <text x="9" y="6.5" class="brand-subtitle-light" fill="#0369A1" fill-opacity="0.95">SHARED ACCESS PLATFORM</text>
+    <line x1="225" y1="3.5" x2="265" y2="3.5" stroke="#0284C7" stroke-opacity="0.4" stroke-width="1.2" stroke-linecap="round" />
+    <circle cx="269" cy="3.5" r="1.2" fill="#0284C7" fill-opacity="0.7" />
+  </g>
+</svg>

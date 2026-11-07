@@ -11,17 +11,41 @@ struct Platform: Identifiable, Codable, Equatable {
     let duration: String
     let systemImage: String
     let accent: String
+    var liveId: Int?
 
     var isSoldOut: Bool { slotsLeft == 0 }
     var formattedPrice: String { "KES \(priceKES)" }
+
+    /// Maps the live site icon_name to an SF Symbol. The site stores
+    /// icon names, not SF Symbols, so unknown names fall back to a
+    /// sparkle instead of failing.
+    static func systemImage(for iconName: String, name: String) -> String {
+        switch iconName.lowercased() {
+        case "music", "spotify": return "music.note"
+        case "tv", "video", "play": return "play.tv.fill"
+        case "paintbrush", "design", "canva": return "paintbrush.fill"
+        case "waveform", "audio": return "waveform"
+        case "graduationcap", "course", "learn": return "graduationcap.fill"
+        case "sparkles", "ai": return "sparkles"
+        case "appletv": return "appletv.fill"
+        default:
+            let lower = name.lowercased()
+            if lower.contains("music") || lower.contains("spotify") || lower.contains("tidal") {
+                return "music.note"
+            }
+            if lower.contains("video") || lower.contains("tv") { return "play.tv.fill" }
+            if lower.contains("course") || lower.contains("udemy") { return "graduationcap.fill" }
+            if lower.contains("canva") || lower.contains("design") { return "paintbrush.fill" }
+            return "sparkles"
+        }
+    }
 }
 
 extension Platform {
-    /// Bundled catalogue. Per-platform prices and stock were last fully
-    /// verified on 3 Nov 2026. The live homepage on 7 Nov 2026 showed
-    /// 67 slots in rotation and 7 community suggestions, so the bundled
-    /// per-platform figures may already be behind the live site. The app
-    /// labels this date in the catalogue and tries a live refresh.
+    /// Bundled catalogue, used ONLY as an offline fallback. Per-platform
+    /// prices and stock were last fully verified on 3 Nov 2026. The app
+    /// labels this date whenever it shows bundled data, and never
+    /// presents bundled data as live.
     static let bundled: [Platform] = [
         Platform(id: "spotify", name: "Spotify Premium Family", tagline: "Music for the whole household", priceKES: 180, slotsLeft: 0, duration: "1 month", systemImage: "music.note", accent: "green"),
         Platform(id: "prime-video", name: "Prime Video", tagline: "Films and series, on demand", priceKES: 120, slotsLeft: 10, duration: "1 month", systemImage: "play.tv.fill", accent: "blue"),
@@ -33,15 +57,52 @@ extension Platform {
         Platform(id: "gemini-plus", name: "Gemini Plus 12 Months", tagline: "AI help for a full year", priceKES: 200, slotsLeft: 10, duration: "12 months", systemImage: "sparkles", accent: "blue")
     ]
 
-    /// Homepage total shown on premiumslots.tech on 7 Nov 2026.
-    /// Shown separately from the bundled per-platform figures above.
     static let liveTotalSlotsOnHomepage = 67
     static let communitySuggestions = 7
     static let stockVerifiedDate = "3 Nov 2026"
     static let homepageCheckedDate = "7 Nov 2026"
 }
 
-// MARK: - Order
+// MARK: - Live subscription (from the API)
+
+struct LiveSubscription: Identifiable, Equatable {
+    let id: Int
+    let serviceRequested: String
+    let amountDue: Int
+    let mpesaCode: String?
+    let status: String
+    let expiryDate: String?
+    let issueReported: Bool
+    let accountGroup: String?
+
+    var orderStatus: OrderStatus {
+        switch status {
+        case "Approved": return .active
+        case "Cancelled": return .issue
+        default: return .pendingVerification
+        }
+    }
+
+    var daysLeft: Int? {
+        guard let expiryDate else { return nil }
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: expiryDate) else { return nil }
+        return Calendar.current.dateComponents([.day], from: Date(), to: date).day
+    }
+
+    init(_ api: APISubscription) {
+        id = api.id
+        serviceRequested = api.service_requested
+        amountDue = api.amount_due
+        mpesaCode = api.mpesa_code
+        status = api.status
+        expiryDate = api.expiry_date
+        issueReported = api.issue_reported ?? false
+        accountGroup = api.account_group
+    }
+}
+
+// MARK: - Order (local, kept for backwards compatibility)
 
 enum OrderStatus: String, Codable, CaseIterable {
     case pendingVerification = "Pending verification"
@@ -81,24 +142,48 @@ struct SlotOrder: Identifiable, Codable, Equatable {
 
 // MARK: - App state
 
+enum LiveState {
+    case unknown
+    case live
+    case offline
+}
+
 @MainActor
 final class AppState: ObservableObject {
+    let api = APIClient.shared
+
     @Published var platforms: [Platform] = Platform.bundled
-    @Published var orders: [SlotOrder] = []
-    @Published var waitlist: Set<String> = []
-    @Published var searchText = ""
-    @Published var sortByPriceAscending = true
-    @Published var showAvailableOnly = false
+    @Published var liveState: LiveState = .unknown
     @Published var liveTotalSlots: Int? = Platform.liveTotalSlotsOnHomepage
     @Published var refreshMessage: String?
     @Published var isRefreshing = false
     @Published var lastRefreshAttempt: Date?
 
+    @Published var orders: [SlotOrder] = []
+    @Published var liveSubscriptions: [LiveSubscription] = []
+    @Published var waitlist: Set<String> = []
+    @Published var searchText = ""
+    @Published var sortByPriceAscending = true
+    @Published var showAvailableOnly = false
+
+    @Published var user: APIUser?
+    @Published var isLoggedIn = false
+    @Published var walletBalance: Int?
+    @Published var referralCount: Int?
+
+    @Published var isAdminLoggedIn = false
+    @Published var adminStats: AdminStatsResponse?
+    @Published var adminPending: [APISubscription] = []
+    @Published var adminSubscriptions: [APISubscription] = []
+    @Published var adminCustomers: [APICustomer] = []
+
     private let ordersKey = "premiumslots.orders.v1"
     private let waitlistKey = "premiumslots.waitlist.v1"
+    private let adminKey = "premiumslots.admin.v2"
 
     init() {
         loadLocalState()
+        isAdminLoggedIn = UserDefaults.standard.bool(forKey: adminKey)
     }
 
     var platformCount: Int { platforms.count }
@@ -121,9 +206,124 @@ final class AppState: ObservableObject {
         platforms.first { $0.id == id }
     }
 
+    // MARK: - live catalogue
+
+    /// Fetches the live catalogue from /api/v1/services. On success the
+    /// bundled list is replaced and the app is live. On failure the
+    /// bundled list stays, labelled with its verification date, and the
+    /// app says plainly that it is offline.
+    func refreshCatalogue() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        lastRefreshAttempt = Date()
+        do {
+            let response = try await api.services()
+            platforms = response.services.map { $0.platform }
+            liveTotalSlots = response.slots_in_rotation
+            liveState = .live
+            refreshMessage = "Live catalogue from premiumslots.tech just now."
+        } catch {
+            liveState = .offline
+            refreshMessage = "Live service unreachable. Showing saved catalogue from \(Platform.stockVerifiedDate)."
+            await refreshLiveTotal()
+        }
+    }
+
+    /// Homepage-total fallback, as in v1: the only live figure parseable
+    /// from a plain fetch. Kept only so the offline state still shows a
+    /// fresh total when the API is not deployed yet.
+    func refreshLiveTotal() async {
+        guard let url = URL(string: "https://premiumslots.tech") else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let text = String(data: data, encoding: .utf8) else { return }
+            let pattern = #"(\d+)\s+slots in rotation"#
+            if let match = try NSRegularExpression(pattern: pattern).firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+               let range = Range(match.range(at: 1), in: text),
+               let total = Int(text[range]) {
+                liveTotalSlots = total
+            }
+        } catch {
+            // Offline: bundled total stays.
+        }
+    }
+
+    // MARK: - auth
+
+    func login(email: String, password: String) async throws {
+        let response = try await api.login(email: email, password: password)
+        guard response.ok else { throw APIError.message(response.error ?? "Login failed.") }
+        isLoggedIn = true
+        await refreshMe()
+        await refreshMySubscriptions()
+    }
+
+    func register(name: String, email: String, password: String,
+                  whatsappNumber: String) async throws {
+        let response = try await api.register(name: name, email: email,
+                                              password: password,
+                                              whatsappNumber: whatsappNumber)
+        guard response.ok else { throw APIError.message(response.error ?? "Sign-up failed.") }
+        isLoggedIn = true
+        await refreshMe()
+    }
+
+    func logout() async {
+        try? await api.logout()
+        isLoggedIn = false
+        user = nil
+        liveSubscriptions = []
+        walletBalance = nil
+    }
+
+    func refreshMe() async {
+        do {
+            user = try await api.me()
+            walletBalance = user?.wallet_balance
+            referralCount = user?.referral_count
+            isLoggedIn = true
+        } catch {
+            isLoggedIn = false
+        }
+    }
+
+    // MARK: - buying
+
+    func submitOrder(platform: Platform, mpesaCode: String) async throws -> RequestResponse {
+        let response = try await api.submitRequest(serviceName: platform.name,
+                                                   mpesaCode: mpesaCode)
+        guard response.ok else { throw APIError.message(response.error ?? "Order failed.") }
+        await refreshMySubscriptions()
+        return response
+    }
+
+    func refreshMySubscriptions() async {
+        guard isLoggedIn else { return }
+        do {
+            liveSubscriptions = try await api.mySubscriptions().map(LiveSubscription.init)
+        } catch {
+            liveSubscriptions = []
+        }
+    }
+
+    func refreshWallet() async {
+        guard isLoggedIn else { return }
+        do {
+            let wallet = try await api.wallet()
+            walletBalance = wallet.wallet_balance
+        } catch {
+            // Keep the last known balance.
+        }
+    }
+
+    // MARK: - local orders / waitlist (offline fallback)
+
     func joinWaitlist(platformId: String) {
         waitlist.insert(platformId)
         saveLocalState()
+        if let platform = platform(id: platformId), isLoggedIn {
+            Task { try? await api.joinWaitlist(serviceName: platform.name) }
+        }
     }
 
     func leaveWaitlist(platformId: String) {
@@ -145,34 +345,38 @@ final class AppState: ObservableObject {
         saveLocalState()
     }
 
-    /// Tries to read the live homepage total. The homepage is
-    /// JavaScript-rendered, so per-platform rows cannot be parsed from a
-    /// plain text fetch. If parsing fails, bundled data stays in place
-    /// and the caller is told so plainly.
-    func refreshLiveTotal() async {
-        guard let url = URL(string: "https://premiumslots.tech") else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-        lastRefreshAttempt = Date()
+    // MARK: - admin
+
+    func adminLogin(password: String) async throws {
+        try await api.adminLogin(password: password)
+        isAdminLoggedIn = true
+        UserDefaults.standard.set(true, forKey: adminKey)
+        await refreshAdmin()
+    }
+
+    func adminLogout() async {
+        try? await api.adminLogout()
+        isAdminLoggedIn = false
+        UserDefaults.standard.set(false, forKey: adminKey)
+        adminStats = nil
+        adminPending = []
+        adminSubscriptions = []
+        adminCustomers = []
+    }
+
+    func refreshAdmin() async {
+        guard isAdminLoggedIn else { return }
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let text = String(data: data, encoding: .utf8) else {
-                refreshMessage = "Live refresh did not return readable text. Showing bundled stock from \(Platform.stockVerifiedDate)."
-                return
-            }
-            let pattern = #"(\d+)\s+slots in rotation"#
-            if let match = try NSRegularExpression(pattern: pattern).firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-               let range = Range(match.range(at: 1), in: text),
-               let total = Int(text[range]) {
-                liveTotalSlots = total
-                refreshMessage = "Live total updated from premiumslots.tech just now. Per-platform stock is still the bundled list from \(Platform.stockVerifiedDate)."
-            } else {
-                refreshMessage = "Live site reached, but per-platform rows could not be parsed from it. Showing bundled stock from \(Platform.stockVerifiedDate)."
-            }
+            adminStats = try await api.adminStats()
+            adminPending = try await api.adminSubscriptions(status: "Pending")
+            adminSubscriptions = try await api.adminSubscriptions()
+            adminCustomers = try await api.adminCustomers()
         } catch {
-            refreshMessage = "Live refresh failed. Showing bundled stock from \(Platform.stockVerifiedDate)."
+            // Admin needs the live API; the views show that state.
         }
     }
+
+    // MARK: - local persistence
 
     private func loadLocalState() {
         if let data = UserDefaults.standard.data(forKey: ordersKey),

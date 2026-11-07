@@ -4,52 +4,57 @@ struct HowItWorksView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("How PremiumSlots works")
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("How it works")
                         .font(.psTitle)
-                    Text("A shared-subscription platform. You buy one slot on a shared account, for one device, instead of paying for a full plan on your own.")
+                    Text("PremiumSlots sells slots on shared subscriptions. You pay by M-PESA, your code is verified, and you get your own profile on the account through an encrypted vault.")
                         .font(.psBody)
                         .foregroundStyle(.psMuted)
 
-                    step(number: 1, icon: "person.crop.circle.badge.plus", title: "Create an account", text: "Sign up on premiumslots.tech, or in this app once accounts are connected.")
-                    step(number: 2, icon: "creditcard.fill", title: "Pay by M-PESA", text: "Choose a platform, then send the exact amount by M-PESA.")
-                    step(number: 3, icon: "number", title: "Submit your code", text: "Enter the M-PESA transaction code from your confirmation message.")
-                    step(number: 4, icon: "lock.shield.fill", title: "Get instant access", text: "Once verified, your vault details appear in My Slots. 1 slot = 1 device.")
+                    stepRow(number: "1", title: "Pick a platform",
+                            text: "Choose a platform from the catalogue and check the price and slots left.")
+                    stepRow(number: "2", title: "Pay by M-PESA",
+                            text: "Send the exact amount to PayBill 400200, account 1192526. Keep the transaction code from your confirmation message.")
+                    stepRow(number: "3", title: "Submit your code",
+                            text: "Enter the 10-letter-and-number M-PESA code in checkout. The team verifies it and approves your slot.")
+                    stepRow(number: "4", title: "Get your details",
+                            text: "Your vault details appear in My Slots once your order is Active. 1 slot = 1 device, so use it on your own device only.")
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Good to know")
                             .font(.psHeadline)
-                        rule(icon: "iphone", text: "1 slot = 1 device. Do not share your slot with another device.")
-                        rule(icon: "person.fill", text: "Do not change the account password or email. Your own profile is provided.")
-                        rule(icon: "clock.fill", text: "Slots run for the period shown on each platform, for example 1 month or 12 months for Gemini Plus.")
-                        rule(icon: "questionmark.circle.fill", text: "If a slot has a problem, open it in My Slots and flag it as needing attention.")
+                        ruleRow(icon: "lock.shield.fill", text: "Your login details are stored in an encrypted vault. They are revealed once only.")
+                        ruleRow(icon: "person.fill", text: "Never change the account password or email. Report any issue from My Slots.")
+                        ruleRow(icon: "arrow.clockwise", text: "Renew before your slot expires to keep the same profile.")
                     }
-                    .padding(16)
+                    .padding(14)
                     .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                    Text("\(Platform.bundled.count) platforms · \(Platform.liveTotalSlotsOnHomepage) slots in rotation · \(Platform.communitySuggestions) community suggestions, as shown on the homepage on \(Platform.homepageCheckedDate).")
+                    Text("Support: WhatsApp +254 799 242 459 · premiumslots.tech")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.psObsidian)
             .navigationTitle("How it works")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
-    private func step(number: Int, icon: String, title: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color.psElectricBlue.opacity(0.18))
-                    .frame(width: 48, height: 48)
-                Image(systemName: icon)
-                    .foregroundStyle(.psCyan)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Step \(number): \(title)")
+    private func stepRow(number: String, title: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(number)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.psCyan)
+                .frame(width: 32, height: 32)
+                .background(Color.psSurface)
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
                     .font(.psHeadline)
                 Text(text)
                     .font(.psBody)
@@ -58,9 +63,10 @@ struct HowItWorksView: View {
         }
     }
 
-    private func rule(icon: String, text: String) -> some View {
+    private func ruleRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
+                .font(.system(size: 20))
                 .foregroundStyle(.psCyan)
                 .frame(width: 22)
             Text(text)

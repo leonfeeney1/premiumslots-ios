@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 64" width="100%" height="100%" fill="none" preserveAspectRatio="xMinYMid meet">
+  <defs>
+    <!-- Color Gradients (Sharp Vectors, Zero Blur) -->
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A5E5FF" />
+      <stop offset="35%" stop-color="#55B7F7" />
+      <stop offset="75%" stop-color="#2D9CE5" />
+      <stop offset="100%" stop-color="#1460A5" />
+    </linearGradient>
+
+    <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7FCDFF" />
+      <stop offset="50%" stop-color="#55B7F7" />
+      <stop offset="100%" stop-color="#2D9CE5" />
+    </linearGradient>
+
+    <linearGradient id="silverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+
+    <linearGradient id="darkShield" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#182230" />
+      <stop offset="50%" stop-color="#0E1622" />
+      <stop offset="100%" stop-color="#060A10" />
+    </linearGradient>
+
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#55B7F7" stop-opacity="0.9" />
+      <stop offset="40%" stop-color="#2D9CE5" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0E1622" stop-opacity="0.9" />
+    </linearGradient>
+  </defs>
+
+  <style>
+    .brand-title {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Plus Jakarta Sans', sans-serif;
+      font-weight: 900;
+      font-size: 32px;
+      letter-spacing: -0.5px;
+    }
+    .brand-subtitle {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 8.5px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+  </style>
+
+  <!-- EMBLEM ICON (Left Anchor: 52x52) -->
+  <g transform="translate(6, 6)">
+    <!-- Base Rounded Shield Frame -->
+    <rect x="0" y="0" width="52" height="52" rx="15" fill="url(#darkShield)" stroke="url(#borderGradient)" stroke-width="1.8" />
+    
+    <!-- Inner High-Tech Edge Border Accent -->
+    <rect x="2.5" y="2.5" width="47" height="47" rx="12.5" fill="none" stroke="#2D9CE5" stroke-opacity="0.3" stroke-width="1" />
+
+    <!-- Stylized Geometric 'P' -->
+    <path d="M 15 13 C 15 12.2 15.6 11.5 16.4 11.5 L 24.5 11.5 C 32 11.5 37 15.5 37 22.5 C 37 29 32 33.5 24.5 33.5 L 21 33.5 L 21 39.5 C 21 40.3 20.3 41 19.5 41 L 16.4 41 C 15.6 41 15 40.3 15 39.5 Z" 
+          fill="url(#brandGradient)" />
+
+    <!-- Inner 'P' Cutout -->
+    <path d="M 21 16.5 L 24 16.5 C 28.5 16.5 31.5 18.5 31.5 22.5 C 31.5 26.2 28.5 28.5 24 28.5 L 21 28.5 Z" 
+          fill="#0B131E" />
+
+    <!-- Angular Slot Energy Tab -->
+    <path d="M 25 32 L 35.5 21.5 C 36.3 20.7 37.8 21.3 37.8 22.5 L 37.8 36 C 37.8 36.8 37.2 37.5 36.4 37.5 L 26.5 37.5 C 25.2 37.5 24.5 36 25 35 Z" 
+          fill="url(#cyanGradient)" opacity="0.95" />
+
+    <!-- 3 Glowing Digital Slot Level Indicators -->
+    <rect x="41" y="17" width="2.5" height="5" rx="1.25" fill="#55B7F7" opacity="0.95" />
+    <rect x="41" y="24" width="2.5" height="5" rx="1.25" fill="#2D9CE5" opacity="0.8" />
+    <rect x="41" y="31" width="2.5" height="5" rx="1.25" fill="#1460A5" opacity="0.6" />
+
+    <!-- Crown Sparkle Star -->
+    <path d="M 40 9 L 41.5 12.5 L 45 14 L 41.5 15.5 L 40 19 L 38.5 15.5 L 35 14 L 38.5 12.5 Z" 
+          fill="url(#silverGradient)" />
+  </g>
+
+  <!-- LOGO TYPOGRAPHY (Single Word Lockup: PremiumSlots) -->
+  <text x="70" y="37" class="brand-title">
+    <tspan fill="url(#silverGradient)">Premium</tspan><tspan fill="url(#cyanGradient)">Slots</tspan>
+  </text>
+
+  <!-- Subtitle Tagline Badge -->
+  <g transform="translate(71, 51)">
+    <circle cx="2" cy="3.5" r="2" fill="#55B7F7" />
+    <text x="9" y="6.5" class="brand-subtitle" fill="#7FCDFF" fill-opacity="0.95">SHARED ACCESS PLATFORM</text>
+    <line x1="225" y1="3.5" x2="265" y2="3.5" stroke="#2D9CE5" stroke-opacity="0.4" stroke-width="1.2" stroke-linecap="round" />
+    <circle cx="269" cy="3.5" r="1.2" fill="#2D9CE5" fill-opacity="0.7" />
+  </g>
+</svg>

@@ -77,3 +77,85 @@ Still not verified without a Mac or Xcode: no actual `xcodebuild` compile has ru
 4. Add real AppIcon artwork.
 5. Product, Archive, then Distribute App (App Store Connect for TestFlight/App Store, or Ad Hoc/Development for limited devices).
 6. Before any App Store submission, review the payment flow with App Store Review guidelines: Apple may require Apple In-App Purchase for digital goods, so the M-PESA web-style flow must be reviewed, and a real backend must be connected to verify M-PESA codes. This build stores orders locally only.
+
+## v2 rebuild (7 Nov 2026) - fixes for the five reported v1 bugs
+
+Built in the workspace only. Laptop untouched, bridge not used, nothing pushed, nothing posted. Full analysis in ANALYSIS.md was read first; all v2 work follows it.
+
+### 1. Full screen (half-screen letterbox fix)
+
+- `PremiumSlots/Info.plist` now has a `UILaunchScreen` dict: `UIColorName` = LaunchBackground (#050505), `UIImageName` = LaunchLogo (the real shield logo), `UIImageRespectsSafeAreaInsets` = true. Version bumped to 2.0 (build 2).
+- `UIRequiredDeviceCapabilities` changed from `armv7` to `arm64` (stale for an iOS 17-only app).
+- `project.pbxproj`: both `INFOPLIST_KEY_UILaunchStoryboardName = "";` lines removed (Debug and Release), and `TARGETED_DEVICE_FAMILY` changed from `"1,2"` to `1` in both configs, so the app is iPhone-only.
+- Every screen now fills the safe area: ScrollView content uses `.frame(maxWidth: .infinity, maxHeight: .infinity)` on a full-screen background, no fixed heights that letterbox.
+- New assets: `Assets.xcassets/LaunchLogo.imageset/launch-logo.png` (real logo-icon render, 512px, transparent), `LogoLockup.imageset/` (dark + light lockups from the real extended SVGs), `LaunchBackground.colorset` (#050505).
+
+### 2. Fonts (oversized type fix)
+
+- New capped type scale in Theme.swift: headings `.psTitle` 22pt semibold max, `.psHeadline` 17pt semibold, body `.psBody` 15pt, captions `.psCaption` 12pt, mono `.psMono` 13pt. No `.largeTitle` anywhere, no forced large titles, all navigation titles `.inline`. Dynamic Type is respected (system-scaled points, nothing forced).
+- Audit: no `.font(.largeTitle)` and no font size 36pt or above in any Swift file. The only 40pt+ numbers left are logo image sizes (RealLogoView size 44/48/56), not type. Icons are 20-24pt throughout.
+
+### 3. Real logo
+
+- The real SVGs were converted directly with cairosvg (installed via pip, `--break-system-packages`): `brand/logo-icon.svg` to `brand/generated/appicon-1024.png` (1024x1024, logo-icon composited on #050505) and `launch-logo.png` (512, transparent); `brand/logo-extended.svg` / `logo-extended-light.svg` to `logo-lockup.png` / `logo-lockup-light.png` (1080x192). Nothing was redrawn or invented.
+- AppIcon.appiconset now has real PNGs for every size (20@2x/3x, 29@2x/3x, 40@2x/3x, 60@2x/3x, 76@2x, 83.5@2x, 1024 marketing) with filenames in Contents.json.
+- `RealLogoView` (Theme.swift) shows the rendered LaunchLogo asset in the header, login and About screens. `ShieldLogoPathView` keeps a faithful SwiftUI redraw of the real shield-P from the SVG path data as a fallback only, if the asset is ever missing. The old drawn-only logo is gone.
+- `LogoLockupView` shows the real extended lockup in the catalogue header.
+
+### 4. Live connection (both sides)
+
+Backend, `backend/api_v1.py` (27 KB, valid Python, `py_compile` passes) plus `backend/README.md`:
+- Endpoints: `GET /api/v1/health`, `GET /api/v1/services`, `GET /api/v1/services/<id>`; `POST /api/v1/auth/register`, `/auth/login`, `/auth/logout`, `GET /api/v1/auth/me`; `GET /api/v1/me/subscriptions`, one-time vault `GET /api/v1/me/subscriptions/<id>/vault`, `GET /api/v1/me/notifications`; `POST /api/v1/request` (10-alphanumeric M-PESA code, duplicate check, Pending), `/waitlist/join`, `/subscription/<id>/report-issue`, `/subscription/<id>/toggle-auto-renew`; `GET /api/v1/wallet`, `POST /api/v1/wallet/deposit`; `GET /api/v1/referrals`; admin `POST /api/v1/admin/login` (hmac.compare_digest against ADMIN_PASSWORD env, session flag), `/admin/logout`, `GET /api/v1/admin/stats`, `/admin/subscriptions`, `/admin/customers`, `/admin/customers/<id>`, `POST /api/v1/admin/subscriptions/<id>/approve` (Approved, expiry via calculate_subscription_expiry, inventory_count decremented, vault credentials), `/reject` (Cancelled), `/customers/<id>/toggle-ban`, `GET/POST /api/v1/admin/services`, `PUT/DELETE /api/v1/admin/services/<id>`.
+- Based exactly on the real routes and tables in ANALYSIS.md §2/§5/§6. No table or field invented. The web `login_required` decorator redirects to a login page, which is wrong for JSON, so the blueprint defines its own `user_required` decorator returning 401 JSON.
+- No password, no secret, and no obscured web admin prefix anywhere in the blueprint or the app. Admin API auth is its own session flag.
+- README explains the drop-in path (`app/blueprints/api_v1.py`), registration in `app/__init__.py`, and the normal cPanel push, plus live health/service checks.
+
+iOS, `PremiumSlots/APIClient.swift` (new): URLSession client for all `/api/v1` endpoints, Flask session cookie carried by shared cookie storage, typed responses, `APIError` with a plain-language message. `Models.swift` rewritten: `AppState.refreshCatalogue()` replaces the bundled list with live services on success and keeps the bundled list with a clear "Offline: using saved catalogue from 3 Nov 2026" banner on failure. Bundled data is never presented as live. Live total from `/services` when reachable; the homepage regex total is kept only as a fallback.
+
+### 5. Admin tab
+
+- New `PremiumSlots/Views/AdminView.swift`, fifth tab in ContentView (Catalogue, My Slots, How it works, Admin, Settings).
+- Admin login is separate from user login, password only, via `/api/v1/admin/login`. When the API is unreachable the tab shows "Admin needs the live API" and no admin data at all. Nothing is faked.
+- Screens: dashboard count cards (pending, approved, issues, users, revenue, slots in rotation), pending approvals with Approve (vault email/password + account group, then Confirm approve) and Reject, subscriptions list, customers list with ban/unban, services list with stock edit (PUT inventory_count).
+
+### 6. UI rebuild in the real site look
+
+- Void black #050505/#0a0a0a, surface #141414, border #1f1f1f, primary #2D9CE5, hover #55B7F7, dim #1E85CC, muted #8B9BB4, text #f5f5f5. System fonts with Archivo/Plus Jakarta Sans style weights (no bundled fonts).
+- Rewritten: Theme.swift (v2 colours, capped type, real logo views), Models.swift (live models, AppState with API), CatalogView (live/offline banner), PlatformDetailView, CheckoutView (exact real flow: PayBill 400200, Account 1192526, Number 0734460218, 10-alphanumeric code, order saved as Pending on the live site), MySlotsView (live subscriptions, one-time vault reveal, report issue), HowItWorksView, SettingsView (account, wallet, referrals, catalogue state), ContentView (5 tabs). New: APIClient.swift, AuthView.swift (user sign-in/sign-up against the live site), AdminView.swift.
+- No emojis anywhere, SF Symbols only. No gambling words anywhere in Swift or the backend (banned-word scan clean).
+
+### 7. Build setup kept
+
+- iOS 17+, shared scheme with BlueprintIdentifier C735DFEA0C160273A74C66DC unchanged, GitHub Actions workflow unchanged and still builds an unsigned IPA (archive + CODE_SIGN_IDENTITY="" + CODE_SIGNING_REQUIRED=NO).
+- pbxproj: 3 new files added with fresh unique 24-hex IDs (APIClient.swift in the PremiumSlots group, AuthView.swift and AdminView.swift in the Views group, all in PBXBuildFile, PBXFileReference, PBXGroup and PBXSourcesBuildPhase). File refs are bare filenames, group path is Views. No double commas, no doubled Views paths.
+
+### Checks run on 7 Nov 2026 (this Linux machine)
+
+- `pbxproj` Python library (installed for the check): project parses, 165 objects, target PremiumSlots, 15 build files. Braces and parentheses balance.
+- `Info.plist` parses; UILaunchScreen present with LaunchBackground + LaunchLogo; version 2.0; armv7 gone.
+- Scheme XML parses; BlueprintIdentifier C735DFEA0C160273A74C66DC present.
+- Workflow YAML parses (jobs: build).
+- Banned-word scan (bet, wager, odds, gamble, casino, jackpot, 18+, Play responsibly) over all Swift files and the backend: zero hits.
+- Em-dash scan over all Swift files: zero hits.
+- Double-comma scan over Swift, pbxproj and Info.plist: zero.
+- Every Swift file referenced in pbxproj exists on disk (14 of 14); every Swift file on disk is referenced (14 of 14).
+- Font audit: no largeTitle, no font size 36pt or above.
+- AppIcon Contents.json: every listed filename exists, including the 1024 marketing icon.
+- LaunchLogo, LogoLockup and LaunchBackground assets exist in the catalog.
+- `python3 -m py_compile backend/api_v1.py` passes.
+- No "/admin" string outside "/api/v1/admin" API paths in Swift; no ADMIN_PASSWORD or secret in Swift.
+- `swift` / `xcodebuild` are not installed on this machine, so no Swift compile was possible here.
+
+### What was NOT verified (needs a Mac/Xcode or a live deploy)
+
+- **No Xcode compile.** Same limit as v1. The GitHub Actions workflow is the first real compile test.
+- **No live API test.** `api_v1.py` has never run against the real Flask app or its PostgreSQL database. Endpoint behaviour (especially approve with vault credentials, the one-time vault reveal, and wallet/referrals fields that the web code reads but that are not in the CREATE TABLE) must be exercised on the live site.
+- **No simulator run.** Full-screen layout, launch screen, logo rendering, tab bar and the admin screens have not been seen on a device or simulator.
+- **No App Store review check.** The M-PESA web-style payment flow still needs review against App Store Review guidelines before any submission.
+
+### Next steps (parent agent owns these)
+
+1. Push from the laptop to leonfeeney1/premiumslots-ios (same route as v1: ship the changed files via bridge /write, commit, push). Files changed/added in v2: Theme.swift, Models.swift, APIClient.swift (new), Views/AuthView.swift (new), Views/AdminView.swift (new), Views/CatalogView.swift, Views/PlatformDetailView.swift, Views/CheckoutView.swift, Views/MySlotsView.swift, Views/HowItWorksView.swift, Views/SettingsView.swift, ContentView.swift, Info.plist, project.pbxproj, Assets.xcassets (AppIcon PNGs, LaunchLogo, LogoLockup, LaunchBackground), backend/api_v1.py + backend/README.md, brand/generated/*.png, BUILD_NOTES.md.
+2. Wait for the GitHub Actions run; if it goes green, download the unsigned IPA artifact and deliver it to Kerry for sideloading, as with v1.
+3. Deploy the backend separately: copy `backend/api_v1.py` to `app/blueprints/api_v1.py` on the laptop, register it in `app/__init__.py`, push via the normal cPanel flow, then verify `GET https://premiumslots.tech/api/v1/health` and `/api/v1/services` live. Until that is done the app runs in its labelled offline mode with the saved catalogue.
+4. Ask Kerry to check on his phone: full-screen (no bezels), normal font sizes, real logo in the header and on the home screen icon, and (after the backend is live) sign-in, a real catalogue, and the Admin tab.

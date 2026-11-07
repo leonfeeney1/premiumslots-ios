@@ -4,10 +4,48 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @AppStorage("premiumslots.appearance") private var appearance = "dark"
     @AppStorage("premiumslots.notifications") private var notificationsEnabled = false
+    @State private var showAuth = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Account") {
+                    if appState.isLoggedIn, let user = appState.user {
+                        HStack {
+                            Text(user.name)
+                                .font(.psHeadline)
+                            Spacer()
+                            Text(user.email)
+                                .font(.psCaption)
+                                .foregroundStyle(.psMuted)
+                        }
+                        if let balance = appState.walletBalance {
+                            HStack {
+                                Text("Wallet balance")
+                                Spacer()
+                                Text("KES \(balance)")
+                                    .foregroundStyle(.psMuted)
+                            }
+                        }
+                        if let referrals = appState.referralCount {
+                            HStack {
+                                Text("Referrals")
+                                Spacer()
+                                Text("\(referrals)")
+                                    .foregroundStyle(.psMuted)
+                            }
+                        }
+                        Button("Sign out", role: .destructive) {
+                            Task { await appState.logout() }
+                        }
+                    } else {
+                        Text("Sign in to see your slots, wallet and referrals on premiumslots.tech.")
+                            .font(.psBody)
+                            .foregroundStyle(.psMuted)
+                        Button("Sign in or create an account") { showAuth = true }
+                    }
+                }
+
                 Section("Appearance") {
                     Picker("Theme", selection: $appearance) {
                         Text("Dark").tag("dark")
@@ -36,13 +74,19 @@ struct SettingsView: View {
                             .foregroundStyle(.psMuted)
                     }
                     HStack {
-                        Text("Slots in rotation (homepage)")
+                        Text("Slots in rotation")
                         Spacer()
                         Text("\(appState.liveTotalSlots ?? Platform.liveTotalSlotsOnHomepage)")
                             .foregroundStyle(.psMuted)
                     }
-                    Button("Refresh live total") {
-                        Task { await appState.refreshLiveTotal() }
+                    HStack {
+                        Text("Catalogue state")
+                        Spacer()
+                        Text(appState.liveState == .live ? "Live" : "Saved copy")
+                            .foregroundStyle(.psMuted)
+                    }
+                    Button("Refresh live catalogue") {
+                        Task { await appState.refreshCatalogue() }
                     }
                     if let message = appState.refreshMessage {
                         Text(message)
@@ -56,17 +100,17 @@ struct SettingsView: View {
 
                 Section("About") {
                     HStack(spacing: 12) {
-                        ShieldLogoView(size: 44)
+                        RealLogoView(size: 44)
                         VStack(alignment: .leading) {
                             Text("PremiumSlots")
                                 .font(.psHeadline)
-                            Text("Version 1.0 (client only)")
+                            Text("Version 2.0 (live API client)")
                                 .font(.psCaption)
                                 .foregroundStyle(.psMuted)
                         }
                     }
                     Link("Visit premiumslots.tech", destination: URL(string: "https://premiumslots.tech")!)
-                    Text("Shared subscriptions. This app is a client only: no backend is connected yet, and orders are stored on this device.")
+                    Text("Shared subscriptions. Live data comes from the /api/v1 endpoints once the backend blueprint is deployed; until then the app shows the saved catalogue and says so.")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
                 }
@@ -79,8 +123,10 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
             .background(Color.psObsidian)
+            .sheet(isPresented: $showAuth) { AuthView() }
         }
     }
 }

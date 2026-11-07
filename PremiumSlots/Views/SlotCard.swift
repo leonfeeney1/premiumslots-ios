@@ -2,20 +2,19 @@ import SwiftUI
 
 struct SlotCard: View {
     let platform: Platform
-    @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(Color.psAccent(named: platform.accent).opacity(0.16))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 48, height: 48)
                 Image(systemName: platform.systemImage)
-                    .font(.title2)
+                    .font(.system(size: 22))
                     .foregroundStyle(Color.psAccent(named: platform.accent))
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(platform.name)
                     .font(.psHeadline)
                     .lineLimit(1)
@@ -43,27 +42,26 @@ struct SlotCard: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 3) {
                 Text(platform.formattedPrice)
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .semibold))
                 Text("per slot")
                     .font(.psCaption)
                     .foregroundStyle(.psMuted)
             }
         }
-        .padding(14)
+        .padding(12)
         .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.psBorder, lineWidth: 1)
         )
     }
 }
 
 #Preview {
     SlotCard(platform: Platform.bundled[1])
-        .environmentObject(AppState())
         .padding()
         .background(Color.psObsidian)
 }

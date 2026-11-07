@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="brandGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A5E5FF" />
+      <stop offset="35%" stop-color="#55B7F7" />
+      <stop offset="75%" stop-color="#2D9CE5" />
+      <stop offset="100%" stop-color="#1460A5" />
+    </linearGradient>
+    <linearGradient id="cyanGradIcon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7FCDFF" />
+      <stop offset="50%" stop-color="#55B7F7" />
+      <stop offset="100%" stop-color="#2D9CE5" />
+    </linearGradient>
+    <linearGradient id="silverGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="60%" stop-color="#F0F4F8" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+    <linearGradient id="darkShieldIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#182230" />
+      <stop offset="50%" stop-color="#0E1622" />
+      <stop offset="100%" stop-color="#060A10" />
+    </linearGradient>
+    <linearGradient id="borderGradIcon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#55B7F7" stop-opacity="0.8" />
+      <stop offset="40%" stop-color="#2D9CE5" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#0E1622" stop-opacity="0.9" />
+    </linearGradient>
+  </defs>
+
+  <!-- Base Rounded Shield Frame -->
+  <rect x="10" y="10" width="80" height="80" rx="22" fill="url(#darkShieldIcon)" stroke="url(#borderGradIcon)" stroke-width="2" />
+  
+  <!-- Inner Rim -->
+  <rect x="13" y="13" width="74" height="74" rx="19" fill="none" stroke="#2D9CE5" stroke-opacity="0.25" stroke-width="1" />
+
+  <!-- Geometric 'P' Back Stem -->
+  <path d="M 33 31 C 33 29.895 33.895 29 35 29 L 46 29 C 57 29 64 35 64 45 C 64 54.5 57 60.5 46 60.5 L 41.5 60.5 L 41.5 69 C 41.5 70.105 40.605 71 39.5 71 L 35 71 C 33.895 71 33 70.105 33 69 Z" 
+        fill="url(#brandGradIcon)" />
+
+  <!-- Inner 'P' Cutout -->
+  <path d="M 41.5 36.5 L 45.5 36.5 C 51.5 36.5 55.5 39.5 55.5 44.8 C 55.5 50 51.5 53 45.5 53 L 41.5 53 Z" 
+        fill="#0B131E" />
+
+  <!-- Angular Slot Energy Tab -->
+  <path d="M 47 58 L 61 44 C 62.2 42.8 64.2 43.6 64.2 45.3 L 64.2 64 C 64.2 65.1 63.3 66 62.2 66 L 48.5 66 C 46.8 66 46 64 47 62.8 Z" 
+        fill="url(#cyanGradIcon)" opacity="0.95" />
+
+  <!-- Digital Slot Level Indicators -->
+  <rect x="68" y="37" width="3.5" height="7" rx="1.75" fill="#55B7F7" opacity="0.9" />
+  <rect x="68" y="47" width="3.5" height="7" rx="1.75" fill="#2D9CE5" opacity="0.75" />
+  <rect x="68" y="57" width="3.5" height="7" rx="1.75" fill="#1460A5" opacity="0.5" />
+
+  <!-- Crown Sparkle -->
+  <path d="M 67 25 L 69 30 L 74 32 L 69 34 L 67 39 L 65 34 L 60 32 L 65 30 Z" 
+        fill="url(#silverGradIcon)" />
+</svg>
