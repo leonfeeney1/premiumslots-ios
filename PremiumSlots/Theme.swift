@@ -30,6 +30,22 @@ extension Color {
     }
 }
 
+// foregroundStyle resolves its argument as a ShapeStyle, not as a Color,
+// so the brand colours need ShapeStyle members too. Without these,
+// `.foregroundStyle(.psMuted)` fails with "type 'ShapeStyle' has no member".
+extension ShapeStyle where Self == Color {
+    static var psObsidian: Color { Color.psObsidian }
+    static var psSurface: Color { Color.psSurface }
+    static var psElectricBlue: Color { Color.psElectricBlue }
+    static var psCyan: Color { Color.psCyan }
+    static var psLightCyan: Color { Color.psLightCyan }
+    static var psDeepBlue: Color { Color.psDeepBlue }
+    static var psMuted: Color { Color.psMuted }
+    static var psPaper: Color { Color.psPaper }
+    static var psInk: Color { Color.psInk }
+    static var psAmber: Color { Color.psAmber }
+}
+
 extension Font {
     static let psTitle = Font.system(size: 28, weight: .bold, design: .default)
     static let psHeadline = Font.system(size: 18, weight: .semibold, design: .default)
