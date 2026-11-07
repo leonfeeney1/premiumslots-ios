@@ -24,6 +24,7 @@ struct ContentView: View {
                 .tabItem {
                     Label("Admin", systemImage: "person.badge.key.fill")
                 }
+                .badge(appState.adminPending.count)
 
             SettingsView()
                 .tabItem {
@@ -31,6 +32,13 @@ struct ContentView: View {
                 }
         }
         .tint(.psCyan)
+        // Onboarding gate, as on the web: after Clerk sign-in, if
+        // WhatsApp or date of birth is missing, the user must finish
+        // onboarding before using the app.
+        .sheet(isPresented: $appState.needsOnboarding) {
+            OnboardingView()
+                .environmentObject(appState)
+        }
     }
 }
 

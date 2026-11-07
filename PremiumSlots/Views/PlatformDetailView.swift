@@ -87,7 +87,7 @@ struct PlatformDetailView: View {
                 .padding(16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.psObsidian)
+            .background(Color.psBackground)
             .navigationTitle(platform.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -97,6 +97,7 @@ struct PlatformDetailView: View {
             }
             .sheet(isPresented: $showCheckout) {
                 CheckoutView(platform: platform)
+                    .psSheetDetents()
             }
         }
     }

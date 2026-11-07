@@ -67,14 +67,6 @@ struct APIService: Decodable, Identifiable {
     }
 }
 
-struct AuthResponse: Decodable {
-    let ok: Bool
-    let error: String?
-    let user_id: Int?
-    let name: String?
-    let email: String?
-}
-
 struct MeResponse: Decodable {
     let ok: Bool
     let user: APIUser?
@@ -86,10 +78,41 @@ struct APIUser: Decodable {
     let email: String
     let whatsapp_number: String
     let is_verified: Bool?
+    let date_of_birth: String?
+    let needs_onboarding: Bool?
     let wallet_balance: Int?
     let loyalty_points: Int?
     let referral_count: Int?
     let loyalty_tier: String?
+}
+
+struct ClerkSyncResponse: Decodable {
+    let ok: Bool
+    let error: String?
+    let user_id: Int?
+    let name: String?
+    let email: String?
+    let needs_onboarding: Bool?
+}
+
+struct OnboardingResponse: Decodable {
+    let ok: Bool
+    let whatsapp_number: String?
+    let date_of_birth: String?
+    let needs_onboarding: Bool?
+}
+
+struct APISession: Decodable, Identifiable {
+    let id: Int
+    let device: String?
+    let ip_address: String?
+    let signed_in_at: String?
+    let last_seen_at: String?
+    let revoked_at: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, device, ip_address, signed_in_at, last_seen_at, revoked_at
+    }
 }
 
 struct SubscriptionsResponse: Decodable {
@@ -108,6 +131,8 @@ struct APISubscription: Decodable, Identifiable {
     let viewed: Bool?
     let issue_reported: Bool?
     let account_group: String?
+    let locked_price: Int?
+    let created_at: String?
 
     var orderStatus: OrderStatus {
         switch status {
@@ -263,6 +288,49 @@ final class APIClient: ObservableObject {
         try await request(path, method: "POST", body: body)
     }
 
+    // MARK: - generic helpers for Fix #4 parity screens
+    // Feature views call these directly with their own small Decodable
+    // types, so no single file has to grow for every new screen.
+    // All responses are the blueprint's {"ok": ..., ...} JSON.
+
+    func fetchJSON<T: Decodable>(_ path: String, method: String = "GET",
+                                 body: [String: Any]? = nil) async throws -> T {
+        try await request(path, method: method, body: body)
+    }
+
+    func fetchOK(_ path: String, method: String = "GET",
+                 body: [String: Any]? = nil) async throws -> APIResponse {
+        try await request(path, method: method, body: body)
+    }
+
+    func putOK(_ path: String, body: [String: Any]? = nil) async throws -> APIResponse {
+        try await request(path, method: "PUT", body: body)
+    }
+
+    func deleteOK(_ path: String) async throws -> APIResponse {
+        try await request(path, method: "DELETE")
+    }
+
+    /// Raw bytes (PDF receipts and statements). Throws APIError on a
+    /// non-2xx status, with the server error text when it is JSON.
+    func fetchData(_ path: String) async throws -> Data {
+        let url = baseURL.appendingPathComponent(path)
+        var urlRequest = URLRequest(url: url)
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            throw APIError.notReachable
+        }
+        guard let http = response as? HTTPURLResponse,
+              (200...299).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIResponse.self, from: data))?.error
+            throw APIError.http((response as? HTTPURLResponse)?.statusCode ?? 0, message ?? "")
+        }
+        return data
+    }
+
     // MARK: - public
 
     func health() async throws {
@@ -281,22 +349,6 @@ final class APIClient: ObservableObject {
 
     // MARK: - auth
 
-    func login(email: String, password: String) async throws -> AuthResponse {
-        try await request("api/v1/auth/login", method: "POST",
-                          body: ["email": email, "password": password])
-    }
-
-    func register(name: String, email: String, password: String,
-                  whatsappNumber: String, referralCode: String? = nil) async throws -> AuthResponse {
-        var body: [String: Any] = ["name": name, "email": email,
-                                    "password": password,
-                                    "whatsapp_number": whatsappNumber]
-        if let referralCode, !referralCode.isEmpty {
-            body["referral_code"] = referralCode
-        }
-        return try await request("api/v1/auth/register", method: "POST", body: body)
-    }
-
     func logout() async throws {
         let _: APIResponse = try await postOK("api/v1/auth/logout")
     }
@@ -305,6 +357,59 @@ final class APIClient: ObservableObject {
         let response: MeResponse = try await request("api/v1/auth/me")
         guard let user = response.user else { throw APIError.decoding }
         return user
+    }
+
+    // MARK: - Clerk auth (v3, Fix #2)
+    // The web signs customers in with Clerk and syncs the Clerk
+    // session into the Flask session. The app does the same: the
+    // Clerk web view signs in, then the session token is posted here.
+
+    func clerkSync(token: String) async throws -> ClerkSyncResponse {
+        try await request("api/v1/auth/clerk-sync", method: "POST",
+                          body: ["token": token])
+    }
+
+    func forgotPassword(email: String) async throws -> APIResponse {
+        try await postOK("api/v1/auth/forgot-password", body: ["email": email])
+    }
+
+    func resetPassword(token: String, password: String) async throws -> APIResponse {
+        try await postOK("api/v1/auth/reset-password",
+                         body: ["token": token, "password": password])
+    }
+
+    func verifyEmail(email: String, code: String) async throws -> APIResponse {
+        try await postOK("api/v1/auth/verify", body: ["email": email, "code": code])
+    }
+
+    func magicLink(email: String) async throws -> APIResponse {
+        try await postOK("api/v1/auth/magic", body: ["email": email])
+    }
+
+    func magicConsume(token: String) async throws -> APIResponse {
+        try await postOK("api/v1/auth/magic/consume", body: ["token": token])
+    }
+
+    func onboarding() async throws -> OnboardingResponse {
+        try await request("api/v1/me/onboarding")
+    }
+
+    func completeOnboarding(whatsappNumber: String,
+                            dateOfBirth: String) async throws -> APIResponse {
+        try await postOK("api/v1/me/onboarding",
+                         body: ["whatsapp_number": whatsappNumber,
+                                "date_of_birth": dateOfBirth])
+    }
+
+    func mySessions() async throws -> [APISession] {
+        struct Wrapper: Decodable { let ok: Bool; let sessions: [APISession]? }
+        let wrapper: Wrapper = try await request("api/v1/me/sessions")
+        return wrapper.sessions ?? []
+    }
+
+    func revokeSession(sessionId: Int) async throws {
+        let _: APIResponse = try await postOK("api/v1/me/sessions/revoke",
+                                              body: ["session_id": sessionId])
     }
 
     // MARK: - my subscriptions, wallet, referrals

@@ -29,15 +29,17 @@ struct AdminView: View {
                 .padding(.vertical, 12)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.psObsidian)
+            .background(Color.psBackground)
             .navigationTitle("Admin")
             .navigationBarTitleDisplayMode(.inline)
+            .refreshable { await appState.refreshAdmin() }
             .alert("Admin sign-in failed", isPresented: $showError) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
             }
             .task { await appState.refreshAdmin() }
+            .safeAreaPadding(.bottom, 8)
         }
     }
 
@@ -65,7 +67,7 @@ struct AdminView: View {
             Button {
                 Task { await login() }
             } label: {
-                if isSubmitting { ProgressView() } else { Text("Sign in as admin") }
+                if isSubmitting { PSRingSpinner(diameter: 20, lineWidth: 2, color: .white, duration: 0.7) } else { Text("Sign in as admin") }
             }
             .psPrimary()
             .disabled(isSubmitting || password.isEmpty)
@@ -125,7 +127,94 @@ struct AdminView: View {
             case 2: customersSection
             default: servicesSection
             }
+
+            moreSections
         }
+    }
+
+    // MARK: - more admin sections (v3 Fix #4)
+
+    private var moreSections: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PSSectionHeader(title: "More sections")
+            VStack(spacing: 0) {
+                adminSectionLink(title: "Analytics", systemImage: "chart.bar.fill") {
+                    AdminAnalyticsRootView()
+                }
+                adminSectionLink(title: "Subscriptions", systemImage: "tray.fill") {
+                    AdminSubscriptionsRootView()
+                }
+                adminSectionLink(title: "Customers", systemImage: "person.2.fill") {
+                    AdminCustomersRootView()
+                }
+                adminSectionLink(title: "Wallet", systemImage: "wallet.bifold.fill") {
+                    AdminWalletRootView()
+                }
+                adminSectionLink(title: "Gift cards", systemImage: "gift.fill") {
+                    AdminGiftCardsRootView()
+                }
+                adminSectionLink(title: "Transactions", systemImage: "arrow.left.arrow.right") {
+                    AdminTransactionsRootView()
+                }
+                adminSectionLink(title: "Payment methods", systemImage: "creditcard.fill") {
+                    AdminPaymentMethodsView()
+                }
+                adminSectionLink(title: "Coupons", systemImage: "ticket.fill") {
+                    AdminCouponsRootView()
+                }
+                adminSectionLink(title: "Blog", systemImage: "doc.text.fill") {
+                    AdminBlogRootView()
+                }
+                adminSectionLink(title: "Help", systemImage: "questionmark.circle.fill") {
+                    AdminHelpRootView()
+                }
+                adminSectionLink(title: "Tickets", systemImage: "envelope.open.fill") {
+                    AdminTicketsRootView()
+                }
+                adminSectionLink(title: "Waitlist", systemImage: "list.bullet") {
+                    AdminWaitlistView()
+                }
+                adminSectionLink(title: "Suggestions", systemImage: "lightbulb.fill") {
+                    AdminSuggestionsRootView()
+                }
+                adminSectionLink(title: "Comms", systemImage: "megaphone.fill") {
+                    AdminCommsView()
+                }
+                adminSectionLink(title: "Security", systemImage: "shield.fill") {
+                    AdminSecurityLogsView()
+                }
+                adminSectionLink(title: "Recycle bin", systemImage: "trash.fill") {
+                    AdminRecycleBinView()
+                }
+                adminSectionLink(title: "Backup", systemImage: "externaldrive.fill") {
+                    AdminBackupStatusView()
+                }
+            }
+            .background(Color.psSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.psBorder, lineWidth: 1)
+            )
+        }
+    }
+
+    private func adminSectionLink<Destination: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            PSNavigationRow {
+                Label(title, systemImage: systemImage)
+                    .font(.psBody)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+        }
+        .accessibilityLabel("Open \(title)")
     }
 
     private func statCard(label: String, value: Int) -> some View {

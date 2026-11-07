@@ -159,3 +159,277 @@ iOS, `PremiumSlots/APIClient.swift` (new): URLSession client for all `/api/v1` e
 2. Wait for the GitHub Actions run; if it goes green, download the unsigned IPA artifact and deliver it to Kerry for sideloading, as with v1.
 3. Deploy the backend separately: copy `backend/api_v1.py` to `app/blueprints/api_v1.py` on the laptop, register it in `app/__init__.py`, push via the normal cPanel flow, then verify `GET https://premiumslots.tech/api/v1/health` and `/api/v1/services` live. Until that is done the app runs in its labelled offline mode with the saved catalogue.
 4. Ask Kerry to check on his phone: full-screen (no bezels), normal font sizes, real logo in the header and on the home screen icon, and (after the backend is live) sign-in, a real catalogue, and the Admin tab.
+
+## v3 rebuild (7 Nov 2026) - Fix #1 (launch, spinner, theme) + Fix #2 (Clerk auth)
+
+Version 3.0 (build 3). Follows PARITY_CHECKLIST.md §3.6, §4, §5, §6.1, §7.1-§7.2.
+
+### Fix #1.1 - Launch logo (over-zoomed splash, fixed)
+
+- Root cause (checklist §5): the v2 LaunchLogo was a single 512x512 full-bleed
+  PNG at 1x, so UILaunchScreen laid it out at 512pt on a ~390pt-wide phone.
+- Fix: regenerated from the real brand/logo-icon.svg with cairosvg, shield
+  rendered at 80% of the canvas so the visible shield is ~66% of the canvas
+  (the SVG viewBox has internal padding; verified by pixel bbox):
+  1x launch-logo.png 120x120, 2x launch-logo@2x.png 240x240,
+  3x launch-logo@3x.png 360x360, all in
+  PremiumSlots/Assets.xcassets/LaunchLogo.imageset/ with a three-scale
+  Contents.json. UILaunchScreen unchanged (LaunchBackground #050505,
+  UIImageName LaunchLogo, respects safe area). The launch background stays
+  #050505 in both themes, as on the web.
+
+### Fix #1.2 - Loading spinner (website HUD loader ported)
+
+- New PremiumSlots/Views/PSLoaderView.swift.
+- PSLoaderView reproduces templates/partials/loader.html faithfully:
+  full-screen #0a0a0a, faint 50px HUD grid drifting 8s linear, 240px ring
+  container (outer 2px dashed ring 20s clockwise; middle ring top #55B7F7 /
+  bottom #2D9CE5, 3s counter-clockwise with cubic-bezier(0.68,-0.55,0.265,1.55)
+  bounce easing; inner #7FCDFF edge ring 5s clockwise; radial core pulsing
+  opacity 0.3-1 over 2s), 60x60 real logo pulsing scale 0.95-1.05 /
+  opacity 0.75-1 over 2s, 320x4px gradient progress bar (#1E85CC -> #2D9CE5
+  -> #7FCDFF) filling scaleX 0-1 from the left then draining 1-0 from the
+  right over 2s, "ESTABLISHING CONNECTION" letterspaced 0.3em #7FCDFF,
+  JetBrains Mono (SF Mono) corner data SYS.INIT / AUTH: PENDING /
+  LOC: NAIROBI / VER: 2.4.1 (decorative HUD strings from the web page only,
+  shown only on this loading screen, never presented as the app's own
+  version). Used at app launch while the stored session is re-validated,
+  fading out over 0.6s (PremiumSlotsApp.swift).
+- PSRingSpinner is the secondary inline spinner (checklist §4.7): 40px/4px
+  ring, border-left #2D9CE5, spin 1s linear; 32px/3px (0.8s), 20px/2px and
+  14px button (0.7s, current colour) variants.
+- No ProgressView() calls remain in any Swift file (the word appears only
+  in a PSLoaderView comment stating the rule).
+
+### Fix #1.3 - Light / Dark theme system
+
+- Theme.swift rewritten: every ps* token is now a dynamic colour
+  (UIColor trait provider), dark values from static/style.css :root and
+  light values from [data-theme="light"] (checklist §4.2): dark bg
+  #0a0a0a / bg-darker #050505 / surface #141414 / border #1f1f1f /
+  text #f5f5f5 / dim #c0c0c0 / primary #2D9CE5 / hover #55B7F7 /
+  dim #1E85CC; light bg #f5f5f0 / bg-darker #ebeae4 / surface #ffffff /
+  border #d9d9d4 / text #1a1a1a / dim #404040 / muted #7a7a7a /
+  primary #1E85CC / hover #176FB0 / dim #135E95. New tokens: psBorderLight,
+  psDanger (#f43f5e / #ef4444), psSuccess #10b981, psWarning #f59e0b,
+  psPrimarySoft. psMuted keeps the v2 #8B9BB4 in dark (better contrast
+  than the web #6a6a6a on black) and #7a7a7a in light.
+- New PSThemeMode enum (system / light / dark). Default is now System in
+  PremiumSlotsApp.swift and SettingsView.swift (was Dark); the choice is
+  persisted in UserDefaults key "premiumslots.appearance" and applied at
+  the app root with .preferredColorScheme. Settings offers System / Light /
+  Dark in a segmented picker, unchanged in layout.
+- All views already used ps* tokens for backgrounds, so they adapt with
+  no per-view edits; grep confirms zero hardcoded Color.black / Color.white
+  backgrounds in any view. LogoLockup already has a light luminosity
+  variant in the asset catalog. The launch background stays #050505 in
+  both themes, as on the web.
+
+### Fix #2.1 - Clerk auth approach (SDK evaluated, WKWebView chosen)
+
+- Checklist §3.6 Option A (Clerk iOS SDK) was evaluated and NOT taken:
+  adding clerk/clerk-ios via Swift Package Manager cannot be verified on
+  this Linux machine (no Swift toolchain, no way to check the package
+  resolves, the module imports, or the build still passes), and an
+  unverifiable SPM dependency risks breaking the Actions build that
+  goes green first try. No SPM dependency was added.
+- Option B implemented instead: PremiumSlots/Views/ClerkAuthView.swift,
+  a WKWebView loading the site's real /auth/login or /auth/register
+  pages, where Clerk JS v5 runs exactly as on the web. The web view
+  carries the "PremiumSlotsApp" user-agent suffix, so the site hides
+  Clerk social buttons in the app, as it does for the Capacitor shell.
+  After Clerk redirects to /auth/clerk_sync, the Flask session cookie
+  is copied from the web view cookie store into URLSession's shared
+  cookie storage (ClerkSessionStore.syncCookiesToSharedStorage) and the
+  session is verified with GET /api/v1/auth/me.
+- AuthView.swift rewritten Clerk-first: "Continue with Clerk" and
+  "Create an account" open the Clerk web view; the v2 own-auth
+  email/password login is removed (AppState.login/register deleted,
+  APIClient.login/register deleted). Clerk-created users have an empty
+  password hash, so the old login could never sign them in.
+- Recovery paths kept as secondary options in AuthView: forgot password
+  and magic-link sign-in (own-auth accounts only).
+- Session persistence: PremiumSlotsApp runs AppState.checkSession() on
+  launch (GET /api/v1/auth/me); a 401 routes back to sign-in. There is
+  no refresh endpoint on the server; the 7-day Flask session is the
+  session, and Clerk's own token refresh happens inside the web view.
+- Onboarding gate: if /me (or clerk-sync) reports needs_onboarding,
+  ContentView presents the native OnboardingView (WhatsApp + date of
+  birth, POST /api/v1/me/onboarding). Presented as a sheet over the tabs.
+- Sign-out clears both sessions: POST /api/v1/auth/logout plus
+  ClerkSessionStore.clearAll() (web view cookies + shared cookies).
+- Role-based routing: customers go to the customer tabs; admin stays the
+  separate password-only /api/v1/admin/login session in the Admin tab.
+  There is no Clerk admin role on the web, so nothing is routed on one.
+
+### Fix #2.2 - Backend auth endpoints (workspace only, NOT deployed)
+
+- backend/api_v1.py is now 1215 lines (was 776). `py_compile` passes.
+- POST /api/v1/auth/clerk-sync: accepts {"token": "<Clerk JWT>"} (or
+  Authorization Bearer), decodes sub from the JWT payload without
+  verifying the signature (exactly as web clerk_sync does), then
+  verifies server-side with GET https://api.clerk.com/v1/users/<sub>
+  using CLERK_SECRET_KEY from the environment (env name only, never a
+  value), finds or creates the Users row (is_verified TRUE, empty
+  password hash, clerk_id), sets session["user_id"] permanent, returns
+  {"ok": true, "user_id", "name", "email", "needs_onboarding"}.
+- POST /api/v1/auth/forgot-password: always returns success (no
+  enumeration); stores a secrets.token_urlsafe(32) reset token expiring
+  in 15 minutes on Users, best-effort email via the site's Flask-Mail.
+- POST /api/v1/auth/reset-password: consumes the token, enforces the
+  web strong-password rule (8+ chars, upper + lower + digit), clears it.
+- POST /api/v1/auth/verify: legacy 6-digit email verification code.
+- POST /api/v1/auth/magic + POST /api/v1/auth/magic/consume: one-time
+  magic-link sign-in via the web's own create_magic_link /
+  consume_magic_link helpers from app.utils (imported with a guarded
+  fallback; consume returns 503 if the helpers are unavailable).
+- GET/POST /api/v1/me/onboarding (WhatsApp + YYYY-MM-DD date of birth),
+  plus POST /api/v1/auth/onboarding as an alias.
+- GET /api/v1/me/sessions + POST /api/v1/me/sessions/revoke: LoginActivity
+  rows (max 3 sessions per user on the web), revoke sets revoked_at.
+- GET /api/v1/auth/me now also returns date_of_birth and needs_onboarding.
+- Defects fixed (checklist §6): GET /api/v1/referrals now queries
+  Referrals WHERE referrer_id (was user_id, which does not exist) and
+  returns referral_count, completed_count, my_code, referral_link and
+  inviter, with per-query rollback guards if optional columns are absent;
+  _subscription_row now returns the real created_at timestamp and
+  locked_price when present (was hardcoded created_at: None).
+- WebAuthn JSON endpoints are NOT included: the web implementation
+  (auth.py:479-759) was not available in the workspace to mirror exactly,
+  and building passkey begin/complete from memory risks breaking the live
+  passkey flow. iOS passkey support (ASAuthorizationPlatformPublicKeyCredentialProvider)
+  is deferred to Fix #4.
+- DEPLOY NOTE: the 9 new POST endpoints are NOT in the site's CSRF exempt
+  list yet. On deploy, add these endpoint names to exempt_endpoints in
+  app/__init__.py (same list that got the 14 api_v1 entries in commit
+  3a0c88a): api_v1.clerk_sync, api_v1.forgot_password,
+  api_v1.reset_password, api_v1.verify_email, api_v1.magic_link,
+  api_v1.magic_consume, api_v1.post_onboarding,
+  api_v1.post_onboarding_alias, api_v1.revoke_session. Until then every
+  one of them will 400 with "Invalid or missing CSRF token" live, while
+  the GET endpoints work.
+- iOS APIClient additions: clerkSync, forgotPassword, resetPassword,
+  verifyEmail, magicLink, magicConsume, onboarding, completeOnboarding,
+  mySessions, revokeSession; new types ClerkSyncResponse,
+  OnboardingResponse, APISession; APIUser gains date_of_birth and
+  needs_onboarding.
+
+### Build setup kept
+
+- iOS 17+, shared scheme BlueprintIdentifier C735DFEA0C160273A74C66DC
+  unchanged, workflow unchanged (still builds an unsigned IPA).
+- pbxproj: 2 new files (PSLoaderView.swift, ClerkAuthView.swift) added
+  to the Views group with bare-filename refs, sourceTree "<group>", in
+  PBXBuildFile, PBXFileReference, PBXGroup and PBXSourcesBuildPhase.
+  Note: the pbxproj library first placed them in the top-level group
+  with sourceTree SOURCE_ROOT; that was caught and fixed by moving them
+  into the Views group and correcting the sourceTree, and by fixing a
+  double-quoted sourceTree value the library wrote. 16 Swift files total,
+  16 build files, no double commas, no doubled Views paths.
+
+### Checks run on 7 Nov 2026 (this Linux machine)
+
+- pbxproj parses (library + text checks): 165 objects, target
+  PremiumSlots, 16 build files. Braces and parentheses balance.
+- Info.plist parses; version 3.0, build 3; UILaunchScreen present.
+- Scheme XML parses; BlueprintIdentifier C735DFEA0C160273A74C66DC present.
+- Workflow YAML parses (jobs: build).
+- Banned-word scan over all Swift files: zero real hits (one substring
+  false positive: "bet" inside "between" in a ClerkAuthView comment).
+- Em-dash scan over all Swift files: zero hits.
+- Double-comma scan over Swift and pbxproj: zero.
+- Every pbxproj Swift ref exists on disk (16 of 16); every Swift file on
+  disk is referenced (16 of 16); all 16 are in the Sources build phase.
+- LaunchLogo assets verified on disk: 120/240/360px, visible shield
+  coverage 0.67 / 0.66 / 0.66 of the canvas.
+- Hardcoded Color.black / Color.white backgrounds: zero in any view.
+- ProgressView() calls: zero in any Swift file.
+- python3 -m py_compile backend/api_v1.py passes.
+- Swift is not installed on this machine, so no Swift compile was
+  possible here. Do not claim a compile passed.
+
+### What was NOT verified (needs a Mac/Xcode or a live deploy)
+
+- No Xcode compile. The GitHub Actions run is the first real compile test.
+- No simulator/device run: the launch logo size, HUD loader animation,
+  light-mode contrast on every screen, Clerk web view sign-in, and the
+  onboarding sheet have not been seen on a device.
+- The new backend endpoints have never run against the real Flask app or
+  PostgreSQL: clerk-sync against the live Clerk Backend API, the magic
+  link helpers, the referrals rewrite (referrer_id columns), sessions
+  (LoginActivity columns), and the Flask-Mail path in forgot-password all
+  need live exercise after deploy. The CSRF exemption for the 9 new POST
+  endpoints must be added at deploy time (see above).
+- The Clerk publishable key value was never needed in the app (the web
+  view loads the site's own Clerk pages, which already carry it).
+
+### Next steps (parent agent owns these)
+
+1. Push v3 from the laptop to leonfeeney1/premiumslots-ios (ship via
+   bridge /write, commit, push). Changed/added: Theme.swift,
+   Models.swift, APIClient.swift, Views/AuthView.swift,
+   Views/ClerkAuthView.swift (new), Views/PSLoaderView.swift (new),
+   Views/CatalogView.swift, Views/MySlotsView.swift,
+   Views/CheckoutView.swift, Views/AdminView.swift,
+   Views/SettingsView.swift, ContentView.swift, PremiumSlotsApp.swift,
+   Info.plist, project.pbxproj, Assets.xcassets/LaunchLogo.imageset
+   (3 PNGs + Contents.json), backend/api_v1.py, backend/README.md,
+   BUILD_NOTES.md, PARITY_CHECKLIST.md.
+2. Wait for the GitHub Actions run; if green, download the unsigned IPA
+   and deliver it to Kerry for sideloading, as with v1/v2.
+3. Deploy the backend separately: copy backend/api_v1.py to
+   app/blueprints/api_v1.py, push via the normal cPanel flow, ADD the 9
+   new POST endpoints to the CSRF exempt_endpoints list in
+   app/__init__.py in the same commit, then verify live:
+   GET /api/v1/health, GET /api/v1/services, and POST
+   /api/v1/auth/login with fake credentials (expect 401, not 400).
+4. Ask Kerry to check on his phone: launch logo size, light and dark
+   mode, the HUD loader, Clerk sign-in with his real account, and the
+   onboarding prompt if his WhatsApp/DOB is missing.
+
+## v3 Fix #3 (HIG overhaul) + Fix #4 (full parity), 7 Nov 2026
+
+### Fix #3 — what changed
+- New shared component library `PremiumSlots/Views/PSComponents.swift`: PSCard, PSSectionHeader, PSEmptyState, PSErrorState (with retry), PSOfflineBanner, PSLiveBanner, PSStatusPill, psTextField style, PSNavigationRow, psScreenPadding (16pt), psSheetDetents (medium + large, grabber), psTouchTarget (44pt minimum). Every screen now uses these instead of one-off styling.
+- CatalogView: inset-grouped List, pull-to-refresh, shared empty/error states, accessibility labels on rows, detail sheet with detents. Screen background is now psBackground (correct in light mode too).
+- MySlotsView: inset-grouped List with Active / Pending verification / Past sections, pull-to-refresh, status pills, detail sheet (SubscriptionDetailSheet) with locked-price row, timeline and request-review (Fix #4).
+- HowItWorksView: inset-grouped List with Steps / Good to know sections.
+- SettingsView: grouped Form with section headers, Features section linking all 14 customer root views.
+- AdminView: pull-to-refresh, psBackground, admin badge on the tab (pending count), "More sections" list linking all 18 admin root views.
+- PlatformDetailView / CheckoutView / AuthView: sheet detents on all modals, psBackground screen backgrounds.
+- ContentView: Admin tab badge shows the pending-approval count.
+- APIClient.swift: generic helpers for Fix #4 screens (fetchJSON, fetchOK, putOK, deleteOK, fetchData for PDFs); APISubscription gains locked_price + created_at; Models.swift LiveSubscription gains lockedPrice, shown in the detail sheet.
+
+### Fix #4 — backend (workspace only, NOT deployed)
+- backend/api_v1.py: 1,215 → 5,291 lines, 151 routes total (110 new), built by a subagent against PARITY_CHECKLIST.md §6.2/§6.3 and ANALYSIS.md. Customer: dashboard, waitlist positions, suggestions, coupon validate, gateway-aware /request (mpesa/stk/wallet, KES 25,000 daily velocity cap, WALLET-NEW-/WALLET-RNW- refs), checkout status / pay retry / verify-manual, wallet instant-renew / redeem-gift-card / statement JSON + PDF, subscription timeline / request-review, gift cards (list/create/redeem/verify), store + redeem, loyalty, achievements, leaderboard, wishlist (vote/notify/submit), feedback, tickets, help, blog, receipts PDF + HMAC verify, GDPR consent + export request, profile/password/privacy/delete account, birthday, notifications read + unread count. Wallet response extended with metrics, denominations, renewable_subscriptions, daily_spend_limit. Admin: analytics (days/service/status, daily revenue, churn honest empty state), financial engine, export CSV, report PDF, subscription bulk-update/edit/renew/cancel/delete/unhide/remind-expiry, customer toggle-emails/delete/adjust-wallet/adjust-points/reset-password/send-email/create/export/bulk-action, wallet admin (deposits approve/reject, adjust), gift-card admin (issue/resend/approve/reject/toggle), transactions + verify, payment methods + gateway switch, coupons admin (CRUD/redemptions/blast), blog/help admin (CRUD), tickets (resolve/delete), waitlist message, suggestions admin, bulk email, broadcast, promo banner, security logs (list/purge/revoke), recycle bin (list/restore), backup status only (no download/upload).
+- New CSRF-exemption list: 69 new POST/PUT/DELETE endpoint names recorded in backend/README.md (in addition to the 9 from v3 Fix #2 and the 14 from the first deploy). They must be added to exempt_endpoints in app/__init__.py at deploy time or every one of them will 400 live.
+- Deliberately NOT built: WebAuthn JSON endpoints (route list only in ANALYSIS.md; RP id/origin/challenge details missing — recorded in backend header + README), raw DB query, backup download/upload, fix-db, spin wheel, cron/SEO routes, Clerk Backend API calls from the app. The deployed toggle-ban does NOT do a Clerk sync (checklist assumed it did); customer create/delete do the local DB action with a TODO comment for the server-side Clerk sync.
+
+### Fix #4 — iOS screens (workspace only, version still 3.0 build 3)
+- Customer commerce (WalletView.swift, GiftCardsView.swift, StoreLoyaltyView.swift): WalletRootView (balance, metrics, denominations, deposit, transactions, instant-renew, redeem gift card, statement JSON + PDF share), GiftCardsRootView (5 themes with exact hexes, create, issued/redeemed, verify + redeem), StoreRootView, LoyaltyRootView, AchievementsRootView, LeaderboardRootView (monthly/all-time), BirthdaySaveView.
+- Customer account/content (DashboardView.swift, HelpBlogView.swift, TicketsView.swift, AccountView.swift, NotificationsView.swift, WishlistView.swift): DashboardRootView (subs, ledger, waitlist positions, unread count, global alert, hero/stats/marquee/process/rankings/FAQ, suggestions), HelpRootView + BlogRootView + PrivacyView + TermsView + ReceiptsView, TicketsRootView (tickets + feedback), AccountRootView (profile, password, privacy toggles, sessions + revoke, security, delete account, GDPR), NotificationsRootView, WishlistRootView. CheckoutView gained coupon validate preview, payment-method picker (manual M-PESA / STK / wallet), staged checkout-status screen with retry + verify-manual.
+- Admin (AdminAnalyticsView.swift, AdminSubscriptionsView.swift, AdminCustomersView.swift, AdminWalletView.swift, AdminContentView.swift, AdminOpsView.swift): 18 root views covering analytics, financial engine, exports, subscription management, customer management (search, filter pills, sort, detail drawer, all 9 actions), wallet/gift-card/transactions/payment-methods admin, coupons/blog/help admin, tickets, waitlist, suggestions, bulk email, broadcast, promo banner, security logs, recycle bin, backup status. Every destructive action has a confirmation; every root view shows the "Admin needs the live API" state when not signed in.
+- pbxproj: 16 new Swift files registered (text-based registration cloning the SlotCard entries, fresh unique 24-hex IDs; 68 unique definitions; the earlier pbxproj-library attempt hung and was abandoned). 32 Swift files total, 33 build files (incl. Assets.xcassets).
+- PARITY_CHECKLIST.md: 116 of 122 items now checked. The 6 unchecked are deliberate: spin wheel (no customer-facing feature exists), Passkeys/WebAuthn (endpoints not built), test email (low priority, web-only), fix-db (one-off maintenance), raw DB query (never build — security hole), native Clerk iOS SDK (Option A evaluated and not taken in v3; Option B WKWebView is the implemented route).
+
+### Checks run on 7 Nov 2026 (this Linux machine)
+- pbxproj: 68 unique definitions, braces/parens balance, no double commas, every Swift ref exists on disk (32 of 32), every Swift file on disk referenced (32 of 32), all in the Sources build phase.
+- Info.plist parses; version 3.0, build 3; UILaunchScreen present.
+- Scheme XML parses; BlueprintIdentifier C735DFEA0C160273A74C66DC present. Workflow YAML parses (jobs: build).
+- Banned-word scan over all Swift files: zero hits. Em-dash scan: zero. ProgressView() calls: zero. Hardcoded Color.black/Color.white backgrounds: zero (one substring false positive only: "color: .white" inside a spinner label).
+- No duplicate top-level type declarations across Swift files. Every APIClient method called from the new views exists. AppState members used by the new views exist (logout, refreshMe are methods).
+- python3 -m py_compile backend/api_v1.py passes. AST route check by the backend agent: 151 routes, 0 duplicates, 0 collisions. Smoke import with stubbed app.database/app.utils: blueprint registers 151 rules, /health returns {"ok": true}, /admin/analytics, /me/dashboard, /wallet return 401 without a session, public /help returns 200.
+- Swift is not installed on this machine, so no Swift compile was possible here. Do not claim a compile passed.
+
+### What was NOT verified (needs a Mac/Xcode or a live deploy)
+- No Xcode compile. The GitHub Actions run is the first real compile test for the 16 new files and the 3 edited shared files.
+- No simulator/device run: the HIG layouts, sheets with detents, inset-grouped lists, light-mode contrast on the new screens, and the admin screens have not been seen on a device.
+- The new backend endpoints have never run against the real Flask app or PostgreSQL: STK initiation import path and return shape, receipt HMAC key, exact production columns for Coupons/GiftCards/RewardItems/SupportTickets/WishlistItems/BlogPosts/HelpArticles/BadgeDefinitions/LoyaltyLedger, churn importability, and the minimal built-in PDF writer (not fpdf2 as on the web) all need live exercise after deploy. The 69 new POST/PUT/DELETE endpoints need CSRF exemption at deploy time (see above).
+- Privacy toggle initial values are not read from the server (/api/v1/auth/me returns no notification-preference fields), so both toggles start on in the app and save on change.
+- The admin customers list endpoint does not return is_active/is_vip/has_wallet/LTV, so those filters degrade gracefully (VIP falls back to the 750-point Gold threshold, has-wallet to balance above zero, active to not-banned).
+
+### Next steps (parent agent owns these)
+1. Push v3 Fix #3/#4 from the laptop to leonfeeney1/premiumslots-ios (ship via bridge /write, commit, push). Changed/added: 16 new Swift files, edited CatalogView.swift, MySlotsView.swift, SettingsView.swift, AdminView.swift, CheckoutView.swift, PlatformDetailView.swift, AuthView.swift, ContentView.swift, APIClient.swift, Models.swift, project.pbxproj, backend/api_v1.py, backend/README.md, BUILD_NOTES.md, PARITY_CHECKLIST.md.
+2. Wait for the GitHub Actions run; if green, download the unsigned IPA and deliver it to Kerry for sideloading, as with v1/v2/v3.
+3. Deploy the backend separately: copy backend/api_v1.py to app/blueprints/api_v1.py, push via the normal cPanel flow, ADD the 69 new POST/PUT/DELETE endpoint names (backend/README.md) plus the 9 from v3 Fix #2 to the CSRF exempt_endpoints list in app/__init__.py in the same commit, then verify live: GET /api/v1/health, GET /api/v1/services, POST /api/v1/auth/login with fake credentials (expect 401, not 400), and spot-check a new endpoint such as GET /api/v1/me/dashboard (expect 401 without a session, not 500).
+4. Ask Kerry to check on his phone: the redesigned navigation and lists, light and dark mode on the new screens, Clerk sign-in, wallet/gift cards/store, and the Admin tab sections.

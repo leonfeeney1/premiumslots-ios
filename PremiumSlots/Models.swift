@@ -74,6 +74,9 @@ struct LiveSubscription: Identifiable, Equatable {
     let expiryDate: String?
     let issueReported: Bool
     let accountGroup: String?
+    /// Grandfathered price for this subscription, when the live site
+    /// carries one (locked_price column, when present on production).
+    let lockedPrice: Int?
 
     var orderStatus: OrderStatus {
         switch status {
@@ -99,6 +102,7 @@ struct LiveSubscription: Identifiable, Equatable {
         expiryDate = api.expiry_date
         issueReported = api.issue_reported ?? false
         accountGroup = api.account_group
+        lockedPrice = api.locked_price
     }
 }
 
@@ -168,6 +172,8 @@ final class AppState: ObservableObject {
 
     @Published var user: APIUser?
     @Published var isLoggedIn = false
+    @Published var needsOnboarding = false
+    @Published var isCheckingSession = true
     @Published var walletBalance: Int?
     @Published var referralCount: Int?
 
@@ -248,29 +254,49 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - auth
+    // MARK: - auth (Clerk, v3)
+    // The v2 own-auth login/register are gone: Clerk-created accounts
+    // have an empty password hash, so that login could never sign
+    // them in. Customers sign in with Clerk (ClerkAuthView) and the
+    // session is the 7-day Flask session cookie, checked on launch
+    // with GET /api/v1/auth/me. There is no refresh endpoint on the
+    // server; if the session has expired, /me returns 401 and the
+    // app routes back to sign-in.
 
-    func login(email: String, password: String) async throws {
-        let response = try await api.login(email: email, password: password)
-        guard response.ok else { throw APIError.message(response.error ?? "Login failed.") }
-        isLoggedIn = true
+    /// Called on launch: re-validate the stored Flask session.
+    /// Sets isLoggedIn from the live answer, never from a stored flag.
+    func checkSession() async {
+        isCheckingSession = true
+        defer { isCheckingSession = false }
         await refreshMe()
+        if isLoggedIn {
+            needsOnboarding = user?.needs_onboarding ?? false
+            await refreshMySubscriptions()
+        }
+    }
+
+    /// Called after the Clerk web view completes sign-in and the
+    /// Flask session cookie has been copied into shared storage.
+    func clerkSignedIn(needsOnboarding: Bool) async {
+        isLoggedIn = true
+        self.needsOnboarding = needsOnboarding
+        await refreshMe()
+        self.needsOnboarding = user?.needs_onboarding ?? needsOnboarding
         await refreshMySubscriptions()
     }
 
-    func register(name: String, email: String, password: String,
-                  whatsappNumber: String) async throws {
-        let response = try await api.register(name: name, email: email,
-                                              password: password,
-                                              whatsappNumber: whatsappNumber)
-        guard response.ok else { throw APIError.message(response.error ?? "Sign-up failed.") }
-        isLoggedIn = true
+    func finishOnboarding() async {
+        needsOnboarding = false
         await refreshMe()
     }
 
     func logout() async {
         try? await api.logout()
+        // Sign-out must clear both sessions: the Flask cookie and
+        // the Clerk session in the web view's cookie store.
+        await ClerkSessionStore.clearAll()
         isLoggedIn = false
+        needsOnboarding = false
         user = nil
         liveSubscriptions = []
         walletBalance = nil

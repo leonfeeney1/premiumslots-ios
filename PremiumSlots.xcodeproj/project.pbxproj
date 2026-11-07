@@ -7,41 +7,77 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		585DA461E1DE3AB5136612BE /* PremiumSlotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */; };
-		B8999ECE27D297F020299F66 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4087EC7559401B3F62CABF /* ContentView.swift */; };
+		057C57A1722243C8B567470E /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496040DDAF4440EE9D82EF57 /* AdminView.swift */; };
+		28BB04C99D3C4918F70E3E17 /* CheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE7CDE0689036A536E1EABF /* CheckoutView.swift */; };
+		2F330915458AD97AC877CEB5 /* PlatformDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */; };
+		33978E4FDFBE6A760B2143B9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6D196DA7F0108A072F670C /* SettingsView.swift */; };
 		3DD78CD055CEA604C926BE9C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9D3E379DD97D2A4D79A984 /* Models.swift */; };
 		3E31102351BD559C5EC3C189 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCDDEF57AF2A6A4373FEF648 /* Theme.swift */; };
-		D57DDEE24B65FA9766C5894F /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D62D1347F6783D1323CE4D2 /* CatalogView.swift */; };
-		2F330915458AD97AC877CEB5 /* PlatformDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */; };
-		28BB04C99D3C4918F70E3E17 /* CheckoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE7CDE0689036A536E1EABF /* CheckoutView.swift */; };
-		D02FB7E024D5CB145E909189 /* MySlotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3888DBE22CE412ACB94000D2 /* MySlotsView.swift */; };
-		79766E173C8478083C910B49 /* HowItWorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A4590BAAB972163A79AF15 /* HowItWorksView.swift */; };
-		33978E4FDFBE6A760B2143B9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6D196DA7F0108A072F670C /* SettingsView.swift */; };
-		D6CA38FAE212EDA9213A31FC /* SlotCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */; };
-		641ABDE62A4D4739A72F9D66 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF79CC3339F4563AC746480 /* APIClient.swift */; };
 		4C36E43667314852A7FC145B /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */; };
-		057C57A1722243C8B567470E /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496040DDAF4440EE9D82EF57 /* AdminView.swift */; };
+		585DA461E1DE3AB5136612BE /* PremiumSlotsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */; };
+		641ABDE62A4D4739A72F9D66 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF79CC3339F4563AC746480 /* APIClient.swift */; };
+		75A0402796CD4B4DB0F0ADE9 /* ClerkAuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A734071BEEA2C8553297D3E /* ClerkAuthView.swift */; };
+		79766E173C8478083C910B49 /* HowItWorksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A4590BAAB972163A79AF15 /* HowItWorksView.swift */; };
+		7E4D4BF48F82FCFA7EA9A3E3 /* PSLoaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4C48E6B8176FCE11916EB1 /* PSLoaderView.swift */; };
 		82ABD478584A2982A46F8563 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */; };
+		B8999ECE27D297F020299F66 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4087EC7559401B3F62CABF /* ContentView.swift */; };
+		D02FB7E024D5CB145E909189 /* MySlotsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3888DBE22CE412ACB94000D2 /* MySlotsView.swift */; };
+		D57DDEE24B65FA9766C5894F /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D62D1347F6783D1323CE4D2 /* CatalogView.swift */; };
+		D6CA38FAE212EDA9213A31FC /* SlotCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */; };
+		87AAFCC218DF094361847E91 /* PSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0884EDC3060599DEC03F9E1A /* PSComponents.swift */; };
+		501069FED5077A07513B2641 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92FDBC20E2D2E772D937D9F /* WalletView.swift */; };
+		AA24513294E657975A490EA0 /* GiftCardsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */; };
+		9A4C307CD388017FF4551BBE /* StoreLoyaltyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */; };
+		7147DCD5018AFE48CA788A5B /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */; };
+		234A7BC62A1A1BC447CFFD29 /* HelpBlogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */; };
+		E4B41576A3CEBBE9FAC96804 /* TicketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9A8F0174192BC9816302DF /* TicketsView.swift */; };
+		B21E2AF4E226C5A95663D910 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E9F4E969F818858E1E645CD /* AccountView.swift */; };
+		FAD686B6207D12B4AD1A315D /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30263CDB52B46A782DB34705 /* NotificationsView.swift */; };
+		FDCA21CB70CF655926E1FAEE /* WishlistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */; };
+		5633031D0BCEA1AF6571D62E /* AdminAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */; };
+		C294D08B62A91CA8350BD93E /* AdminSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */; };
+		9BDE442272BE9C96DDAF7B42 /* AdminCustomersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */; };
+		62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */; };
+		EE0541BF578CCEB51672A0FA /* AdminContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B2C0990C651323460B5961E /* AdminContentView.swift */; };
+		FAB3783C6A63D77628832317 /* AdminOpsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumSlotsApp.swift; sourceTree = "<group>"; };
-		9C4087EC7559401B3F62CABF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		DE9D3E379DD97D2A4D79A984 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		FCDDEF57AF2A6A4373FEF648 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		2D62D1347F6783D1323CE4D2 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
-		2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailView.swift; sourceTree = "<group>"; };
-		3FE7CDE0689036A536E1EABF /* CheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutView.swift; sourceTree = "<group>"; };
-		3888DBE22CE412ACB94000D2 /* MySlotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MySlotsView.swift; sourceTree = "<group>"; };
 		02A4590BAAB972163A79AF15 /* HowItWorksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HowItWorksView.swift; sourceTree = "<group>"; };
 		0F6D196DA7F0108A072F670C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotCard.swift; sourceTree = "<group>"; };
+		0884EDC3060599DEC03F9E1A /* PSComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSComponents.swift; sourceTree = "<group>"; };
+		C92FDBC20E2D2E772D937D9F /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardsView.swift; sourceTree = "<group>"; };
+		A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreLoyaltyView.swift; sourceTree = "<group>"; };
+		A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpBlogView.swift; sourceTree = "<group>"; };
+		7C9A8F0174192BC9816302DF /* TicketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TicketsView.swift; sourceTree = "<group>"; };
+		2E9F4E969F818858E1E645CD /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		30263CDB52B46A782DB34705 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistView.swift; sourceTree = "<group>"; };
+		0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAnalyticsView.swift; sourceTree = "<group>"; };
+		AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSubscriptionsView.swift; sourceTree = "<group>"; };
+		EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminCustomersView.swift; sourceTree = "<group>"; };
+		7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminWalletView.swift; sourceTree = "<group>"; };
+		6B2C0990C651323460B5961E /* AdminContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminContentView.swift; sourceTree = "<group>"; };
+		0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminOpsView.swift; sourceTree = "<group>"; };
+		2885E5EFFDF5586F0E0972F8 /* PlatformDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailView.swift; sourceTree = "<group>"; };
+		2D62D1347F6783D1323CE4D2 /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
+		3888DBE22CE412ACB94000D2 /* MySlotsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MySlotsView.swift; sourceTree = "<group>"; };
+		3A734071BEEA2C8553297D3E /* ClerkAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClerkAuthView.swift; sourceTree = "<group>"; };
 		3DF79CC3339F4563AC746480 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
-		4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		3FE7CDE0689036A536E1EABF /* CheckoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckoutView.swift; sourceTree = "<group>"; };
 		496040DDAF4440EE9D82EF57 /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
-		8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E66913BB80E2651A821BA7B5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		7B4C48E6B8176FCE11916EB1 /* PSLoaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSLoaderView.swift; sourceTree = "<group>"; };
 		8A38EFDB4820E459F186A381 /* PremiumSlots.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PremiumSlots.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9C4087EC7559401B3F62CABF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumSlotsApp.swift; sourceTree = "<group>"; };
+		DE9D3E379DD97D2A4D79A984 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E66913BB80E2651A821BA7B5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		FCDDEF57AF2A6A4373FEF648 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,29 +91,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		FDCE55458AEDB923E3349CD3 = {
-			isa = PBXGroup;
-			children = (
-				79F53C14AD822858C2024F2E /* PremiumSlots */,
-				790D92D7546564BD63D7CABE /* Products */,
-			);
-			sourceTree = "<group>";
-		};
-		79F53C14AD822858C2024F2E /* PremiumSlots */ = {
-			isa = PBXGroup;
-			children = (
-				CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */,
-				9C4087EC7559401B3F62CABF /* ContentView.swift */,
-				DE9D3E379DD97D2A4D79A984 /* Models.swift */,
-				FCDDEF57AF2A6A4373FEF648 /* Theme.swift */,
-				3DF79CC3339F4563AC746480 /* APIClient.swift */,
-				8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */,
-				E66913BB80E2651A821BA7B5 /* Info.plist */,
-				047B8C73919DA3DD55756314 /* Views */ ,
-			);
-			path = PremiumSlots;
-			sourceTree = "<group>";
-		};
 		047B8C73919DA3DD55756314 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -90,6 +103,24 @@
 				152B7E42422CA8FA0DEDEEA3 /* SlotCard.swift */,
 				4C2CB3D772E74F75B1F95EF8 /* AuthView.swift */,
 				496040DDAF4440EE9D82EF57 /* AdminView.swift */,
+				7B4C48E6B8176FCE11916EB1 /* PSLoaderView.swift */,
+				3A734071BEEA2C8553297D3E /* ClerkAuthView.swift */,
+				0884EDC3060599DEC03F9E1A /* PSComponents.swift */,
+				C92FDBC20E2D2E772D937D9F /* WalletView.swift */,
+				89D998185F8608AF8CE1C3AC /* GiftCardsView.swift */,
+				A69794AE4C0F8AAB6EE62C61 /* StoreLoyaltyView.swift */,
+				A1D1E17DAD86C9B6ED058F8F /* DashboardView.swift */,
+				E43B8745E05D86B13DFE21B9 /* HelpBlogView.swift */,
+				7C9A8F0174192BC9816302DF /* TicketsView.swift */,
+				2E9F4E969F818858E1E645CD /* AccountView.swift */,
+				30263CDB52B46A782DB34705 /* NotificationsView.swift */,
+				5CAB644E0AA4F7AD6285E69C /* WishlistView.swift */,
+				0AF9D6BE68ABE722096D706E /* AdminAnalyticsView.swift */,
+				AE2338F314773F31F5B5F2A9 /* AdminSubscriptionsView.swift */,
+				EFE78B08D5C030074887DC0E /* AdminCustomersView.swift */,
+				7D49C39012A1F8E7B8D2DBA9 /* AdminWalletView.swift */,
+				6B2C0990C651323460B5961E /* AdminContentView.swift */,
+				0FC9ABBD08C9447B0498F3C9 /* AdminOpsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -100,6 +131,29 @@
 				8A38EFDB4820E459F186A381 /* PremiumSlots.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		79F53C14AD822858C2024F2E /* PremiumSlots */ = {
+			isa = PBXGroup;
+			children = (
+				CE0E9D87D785F258D38F4349 /* PremiumSlotsApp.swift */,
+				9C4087EC7559401B3F62CABF /* ContentView.swift */,
+				DE9D3E379DD97D2A4D79A984 /* Models.swift */,
+				FCDDEF57AF2A6A4373FEF648 /* Theme.swift */,
+				3DF79CC3339F4563AC746480 /* APIClient.swift */,
+				8FAE0619FDEFB2BFEA61A155 /* Assets.xcassets */,
+				E66913BB80E2651A821BA7B5 /* Info.plist */,
+				047B8C73919DA3DD55756314 /* Views */,
+			);
+			path = PremiumSlots;
+			sourceTree = "<group>";
+		};
+		FDCE55458AEDB923E3349CD3 = {
+			isa = PBXGroup;
+			children = (
+				79F53C14AD822858C2024F2E /* PremiumSlots */,
+				790D92D7546564BD63D7CABE /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -185,12 +239,113 @@
 				641ABDE62A4D4739A72F9D66 /* APIClient.swift in Sources */,
 				4C36E43667314852A7FC145B /* AuthView.swift in Sources */,
 				057C57A1722243C8B567470E /* AdminView.swift in Sources */,
+				7E4D4BF48F82FCFA7EA9A3E3 /* PSLoaderView.swift in Sources */,
+				75A0402796CD4B4DB0F0ADE9 /* ClerkAuthView.swift in Sources */,
+				87AAFCC218DF094361847E91 /* PSComponents.swift in Sources */,
+				501069FED5077A07513B2641 /* WalletView.swift in Sources */,
+				AA24513294E657975A490EA0 /* GiftCardsView.swift in Sources */,
+				9A4C307CD388017FF4551BBE /* StoreLoyaltyView.swift in Sources */,
+				7147DCD5018AFE48CA788A5B /* DashboardView.swift in Sources */,
+				234A7BC62A1A1BC447CFFD29 /* HelpBlogView.swift in Sources */,
+				E4B41576A3CEBBE9FAC96804 /* TicketsView.swift in Sources */,
+				B21E2AF4E226C5A95663D910 /* AccountView.swift in Sources */,
+				FAD686B6207D12B4AD1A315D /* NotificationsView.swift in Sources */,
+				FDCA21CB70CF655926E1FAEE /* WishlistView.swift in Sources */,
+				5633031D0BCEA1AF6571D62E /* AdminAnalyticsView.swift in Sources */,
+				C294D08B62A91CA8350BD93E /* AdminSubscriptionsView.swift in Sources */,
+				9BDE442272BE9C96DDAF7B42 /* AdminCustomersView.swift in Sources */,
+				62F6AE391C0D7FA78695C504 /* AdminWalletView.swift in Sources */,
+				EE0541BF578CCEB51672A0FA /* AdminContentView.swift in Sources */,
+				FAB3783C6A63D77628832317 /* AdminOpsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		125215F993AACBEC3F6507F1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFS = "";
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		2A2AE3AD51DD63DB18BC5506 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PremiumSlots/Info.plist;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = me.starford.premiumslots;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMBED_LIBRARIES_WITH_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		36C116202192E47502F67BAD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -254,63 +409,6 @@
 			};
 			name = Debug;
 		};
-		125215F993AACBEC3F6507F1 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LOCALIZATION_PREFS = "";
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
 		7F2AE29670BA422EB721C172 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -337,49 +435,23 @@
 			};
 			name = Debug;
 		};
-		2A2AE3AD51DD63DB18BC5506 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PremiumSlots/Info.plist;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = me.starford.premiumslots;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMBED_LIBRARIES_WITH_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F56A93ADE573C4DDFCF2B2E1 /* Build configuration list for PBXProject "PremiumSlots" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				36C116202192E47502F67BAD /* Debug */,
-				125215F993AACBEC3F6507F1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		EBDDE339F84F29C407D745A3 /* Build configuration list for PBXNativeTarget "PremiumSlots" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7F2AE29670BA422EB721C172 /* Debug */,
 				2A2AE3AD51DD63DB18BC5506 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F56A93ADE573C4DDFCF2B2E1 /* Build configuration list for PBXProject "PremiumSlots" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36C116202192E47502F67BAD /* Debug */,
+				125215F993AACBEC3F6507F1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,16 +1,24 @@
 import SwiftUI
 
+// MARK: - How it works, v3 Fix #3
+// HIG pass: inset-grouped List, numbered steps with consistent
+// spacing, shared card styling, safe-area padding.
+
 struct HowItWorksView: View {
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("How it works")
-                        .font(.psTitle)
+            List {
+                Section {
                     Text("PremiumSlots sells slots on shared subscriptions. You pay by M-PESA, your code is verified, and you get your own profile on the account through an encrypted vault.")
                         .font(.psBody)
                         .foregroundStyle(.psMuted)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                } header: {
+                    Text("How it works")
+                }
 
+                Section("Steps") {
                     stepRow(number: "1", title: "Pick a platform",
                             text: "Choose a platform from the catalogue and check the price and slots left.")
                     stepRow(number: "2", title: "Pay by M-PESA",
@@ -19,29 +27,28 @@ struct HowItWorksView: View {
                             text: "Enter the 10-letter-and-number M-PESA code in checkout. The team verifies it and approves your slot.")
                     stepRow(number: "4", title: "Get your details",
                             text: "Your vault details appear in My Slots once your order is Active. 1 slot = 1 device, so use it on your own device only.")
+                }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Good to know")
-                            .font(.psHeadline)
-                        ruleRow(icon: "lock.shield.fill", text: "Your login details are stored in an encrypted vault. They are revealed once only.")
-                        ruleRow(icon: "person.fill", text: "Never change the account password or email. Report any issue from My Slots.")
-                        ruleRow(icon: "arrow.clockwise", text: "Renew before your slot expires to keep the same profile.")
-                    }
-                    .padding(14)
-                    .background(Color.psSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                Section("Good to know") {
+                    ruleRow(icon: "lock.shield.fill", text: "Your login details are stored in an encrypted vault. They are revealed once only.")
+                    ruleRow(icon: "person.fill", text: "Never change the account password or email. Report any issue from My Slots.")
+                    ruleRow(icon: "arrow.clockwise", text: "Renew before your slot expires to keep the same profile.")
+                }
 
+                Section {
                     Text("Support: WhatsApp +254 799 242 459 · premiumslots.tech")
                         .font(.psCaption)
                         .foregroundStyle(.psMuted)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.psObsidian)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.psBackground)
             .navigationTitle("How it works")
             .navigationBarTitleDisplayMode(.inline)
+            .safeAreaPadding(.bottom, 8)
         }
     }
 
@@ -51,8 +58,9 @@ struct HowItWorksView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.psCyan)
                 .frame(width: 32, height: 32)
-                .background(Color.psSurface)
+                .background(Color.psPrimarySoft)
                 .clipShape(Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.psHeadline)
@@ -61,6 +69,7 @@ struct HowItWorksView: View {
                     .foregroundStyle(.psMuted)
             }
         }
+        .psTouchTarget()
     }
 
     private func ruleRow(icon: String, text: String) -> some View {
@@ -69,9 +78,11 @@ struct HowItWorksView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.psCyan)
                 .frame(width: 22)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.psBody)
         }
+        .psTouchTarget()
     }
 }
 

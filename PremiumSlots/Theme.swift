@@ -1,30 +1,77 @@
 import SwiftUI
 
-// MARK: - PremiumSlots theme, v2
-// Real brand from the live site (static/style.css, "Void Dark Theme"):
-// void black #050505 / #0a0a0a, surface #141414, border #1f1f1f,
-// primary #2D9CE5, hover #55B7F7, dim #1E85CC, muted #8B9BB4.
-// Type scale, v2: headings 22pt semibold max, body 15pt, captions 12pt,
-// icons 20-24pt. No large titles anywhere. Dynamic Type is respected
-// (all sizes are system-scaled points, nothing is forced).
+// MARK: - PremiumSlots theme, v3 (Fix #1)
+// Complete Light + Dark theme system, tokens taken from the live site:
+// public tokens static/style.css :root (dark) + [data-theme="light"],
+// app shell static/app_style.css, admin static/admin_style.css
+// (checklist §4.2-§4.4). Dark is the site default; Light follows the
+// same blue/cyan brand with the light primary #1E85CC.
+// Every token is a dynamic colour: it resolves from the current
+// trait collection, so it follows both the system setting and the
+// in-app System / Light / Dark choice (applied at the app root with
+// .preferredColorScheme). Views must use these tokens and never a
+// hardcoded black/white background.
+// Type scale, v2/v3: headings 22pt semibold max, body 15pt,
+// captions 12pt, icons 20-24pt. No large titles anywhere.
+// Dynamic Type is respected (all sizes are system-scaled points).
 
 extension Color {
-    static let psObsidian = Color(red: 0.02, green: 0.02, blue: 0.02)
-    static let psBackground = Color(red: 0.04, green: 0.04, blue: 0.04)
-    static let psSurface = Color(red: 0.08, green: 0.08, blue: 0.08)
-    static let psSurfaceHover = Color(red: 0.10, green: 0.10, blue: 0.10)
-    static let psBorder = Color(red: 0.12, green: 0.12, blue: 0.12)
-    static let psText = Color(red: 0.96, green: 0.96, blue: 0.96)
-    static let psDim = Color(red: 0.75, green: 0.75, blue: 0.75)
-    static let psMuted = Color(red: 0.55, green: 0.61, blue: 0.71)
-    static let psPrimary = Color(red: 0.18, green: 0.61, blue: 0.90)
+    /// Dynamic colour: dark value in dark mode, light value in light mode.
+    static func psDynamic(dark: UIColor, light: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+
+    static let psObsidian = psDynamic(
+        dark: UIColor(red: 0.02, green: 0.02, blue: 0.02, alpha: 1),
+        light: UIColor(red: 0.92, green: 0.92, blue: 0.89, alpha: 1)) // #050505 / #ebeae4
+    static let psBackground = psDynamic(
+        dark: UIColor(red: 0.04, green: 0.04, blue: 0.04, alpha: 1),
+        light: UIColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1)) // #0a0a0a / #f5f5f0
+    static let psSurface = psDynamic(
+        dark: UIColor(red: 0.08, green: 0.08, blue: 0.08, alpha: 1),
+        light: UIColor(red: 1.00, green: 1.00, blue: 1.00, alpha: 1)) // #141414 / #ffffff
+    static let psSurfaceHover = psDynamic(
+        dark: UIColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1),
+        light: UIColor(red: 0.94, green: 0.94, blue: 0.93, alpha: 1)) // #1a1a1a / #f0f0ec
+    static let psBorder = psDynamic(
+        dark: UIColor(red: 0.12, green: 0.12, blue: 0.12, alpha: 1),
+        light: UIColor(red: 0.85, green: 0.85, blue: 0.83, alpha: 1)) // #1f1f1f / #d9d9d4
+    static let psBorderLight = psDynamic(
+        dark: UIColor(red: 0.16, green: 0.16, blue: 0.16, alpha: 1),
+        light: UIColor(red: 0.90, green: 0.90, blue: 0.88, alpha: 1)) // #2a2a2a / #e5e5e0
+    static let psText = psDynamic(
+        dark: UIColor(red: 0.96, green: 0.96, blue: 0.96, alpha: 1),
+        light: UIColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1)) // #f5f5f5 / #1a1a1a
+    static let psDim = psDynamic(
+        dark: UIColor(red: 0.75, green: 0.75, blue: 0.75, alpha: 1),
+        light: UIColor(red: 0.25, green: 0.25, blue: 0.25, alpha: 1)) // #c0c0c0 / #404040
+    static let psMuted = psDynamic(
+        dark: UIColor(red: 0.55, green: 0.61, blue: 0.71, alpha: 1),
+        light: UIColor(red: 0.48, green: 0.48, blue: 0.48, alpha: 1)) // #8B9BB4 / #7a7a7a
+    static let psPrimary = psDynamic(
+        dark: UIColor(red: 0.18, green: 0.61, blue: 0.90, alpha: 1),
+        light: UIColor(red: 0.12, green: 0.52, blue: 0.80, alpha: 1)) // #2D9CE5 / #1E85CC
     static let psElectricBlue = Color.psPrimary
-    static let psCyan = Color(red: 0.33, green: 0.73, blue: 0.97)
+    static let psCyan = psDynamic(
+        dark: UIColor(red: 0.33, green: 0.73, blue: 0.97, alpha: 1),
+        light: UIColor(red: 0.12, green: 0.52, blue: 0.80, alpha: 1)) // #55B7F7 / #1E85CC
     static let psLightCyan = Color(red: 0.50, green: 0.80, blue: 1.00)
-    static let psDeepBlue = Color(red: 0.12, green: 0.52, blue: 0.80)
+    static let psDeepBlue = psDynamic(
+        dark: UIColor(red: 0.12, green: 0.52, blue: 0.80, alpha: 1),
+        light: UIColor(red: 0.07, green: 0.37, blue: 0.58, alpha: 1)) // #1E85CC / #135E95
     static let psPaper = Color(red: 0.97, green: 0.98, blue: 0.99)
     static let psInk = Color(red: 0.06, green: 0.09, blue: 0.16)
     static let psAmber = Color(red: 0.96, green: 0.66, blue: 0.18)
+    static let psDanger = psDynamic(
+        dark: UIColor(red: 0.96, green: 0.25, blue: 0.37, alpha: 1),
+        light: UIColor(red: 0.94, green: 0.27, blue: 0.27, alpha: 1)) // #f43f5e / #ef4444
+    static let psSuccess = Color(red: 0.06, green: 0.73, blue: 0.51) // #10b981 both themes
+    static let psWarning = Color(red: 0.96, green: 0.62, blue: 0.04) // #f59e0b both themes
+    static let psPrimarySoft = psDynamic(
+        dark: UIColor(red: 0.18, green: 0.61, blue: 0.90, alpha: 0.14),
+        light: UIColor(red: 0.12, green: 0.52, blue: 0.80, alpha: 0.12))
 
     static func psAccent(named name: String) -> Color {
         switch name {
@@ -39,13 +86,33 @@ extension Color {
     }
 }
 
+/// In-app theme choice, persisted in UserDefaults (key
+/// "premiumslots.appearance"). System follows the device setting until
+/// the user picks Light or Dark, exactly as the web does (localStorage
+/// theme, else prefers-color-scheme, else dark).
+enum PSThemeMode: String, CaseIterable {
+    case system
+    case light
+    case dark
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 // foregroundStyle resolves its argument as a ShapeStyle, not as a Color,
 // so the brand colours need ShapeStyle members too.
 extension ShapeStyle where Self == Color {
     static var psObsidian: Color { Color.psObsidian }
     static var psBackground: Color { Color.psBackground }
     static var psSurface: Color { Color.psSurface }
+    static var psSurfaceHover: Color { Color.psSurfaceHover }
     static var psBorder: Color { Color.psBorder }
+    static var psBorderLight: Color { Color.psBorderLight }
     static var psText: Color { Color.psText }
     static var psDim: Color { Color.psDim }
     static var psMuted: Color { Color.psMuted }
@@ -57,6 +124,10 @@ extension ShapeStyle where Self == Color {
     static var psPaper: Color { Color.psPaper }
     static var psInk: Color { Color.psInk }
     static var psAmber: Color { Color.psAmber }
+    static var psDanger: Color { Color.psDanger }
+    static var psSuccess: Color { Color.psSuccess }
+    static var psWarning: Color { Color.psWarning }
+    static var psPrimarySoft: Color { Color.psPrimarySoft }
 }
 
 extension Font {

@@ -1,18 +1,54 @@
 import SwiftUI
 
+// MARK: - Catalogue, v3 Fix #3
+// HIG overhaul: inset-grouped List, pull-to-refresh, native sheet
+// with detents for the platform detail, shared empty/error states,
+// 16pt screen padding, 44pt touch targets, VoiceOver labels on
+// icon buttons. The list rows are the SlotCard content in a plain
+// row; section headers carry the live/offline state.
+
 struct CatalogView: View {
     @EnvironmentObject private var appState: AppState
     @State private var selectedPlatform: Platform?
+    @State private var loadError: String?
+    @State private var isLoading = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+            List {
+                Section {
                     header
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
                     liveBanner
-                    searchAndFilters
-                    if appState.filteredPlatforms.isEmpty {
-                        emptyState
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
+                }
+
+                Section {
+                    if isLoading && appState.platforms == Platform.bundled {
+                        HStack {
+                            Spacer()
+                            PSRingSpinner(diameter: 24, lineWidth: 2)
+                            Spacer()
+                        }
+                        .listRowBackground(Color.clear)
+                    } else if let loadError {
+                        PSErrorState(message: loadError) {
+                            Task { await load() }
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    } else if appState.filteredPlatforms.isEmpty {
+                        PSEmptyState(
+                            systemImage: "magnifyingglass",
+                            title: "No platforms match your search.",
+                            body: "Try a different name, or clear the available-only filter."
+                        )
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     } else {
                         ForEach(appState.filteredPlatforms) { platform in
                             Button {
@@ -21,36 +57,60 @@ struct CatalogView: View {
                                 SlotCard(platform: platform)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("\(platform.name), \(platform.formattedPrice), \(platform.isSoldOut ? "sold out" : "\(platform.slotsLeft) slots left")")
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         }
                     }
-                    stockNote
+                } header: {
+                    Text("Platforms")
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+
+                Section {
+                    stockNote
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.psObsidian)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.psBackground)
             .navigationTitle("Catalogue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await appState.refreshCatalogue() }
+                        Task { await load() }
                     } label: {
                         if appState.isRefreshing {
-                            ProgressView()
+                            PSRingSpinner(diameter: 20, lineWidth: 2)
                         } else {
                             Label("Refresh", systemImage: "arrow.clockwise")
                         }
                     }
                     .disabled(appState.isRefreshing)
+                    .accessibilityLabel("Refresh catalogue")
                 }
             }
+            .searchable(text: $appState.searchText, prompt: "Search platforms")
+            .refreshable { await load() }
             .sheet(item: $selectedPlatform) { platform in
                 PlatformDetailView(platform: platform)
+                    .psSheetDetents()
             }
-            .searchable(text: $appState.searchText, prompt: "Search platforms")
-            .task { await appState.refreshCatalogue() }
+            .task { await load() }
+            .safeAreaPadding(.bottom, 8)
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        loadError = nil
+        await appState.refreshCatalogue()
+        if appState.liveState == .offline && appState.platforms == Platform.bundled {
+            loadError = nil
         }
     }
 
@@ -64,6 +124,8 @@ struct CatalogView: View {
                     .font(.psCaption)
                     .foregroundStyle(.psMuted)
             }
+            searchAndFilters
+                .padding(.top, 4)
         }
     }
 
@@ -71,23 +133,19 @@ struct CatalogView: View {
         Group {
             switch appState.liveState {
             case .live:
-                Label("Live catalogue from premiumslots.tech",
-                      systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                PSLiveBanner(message: "Live catalogue from premiumslots.tech")
             case .offline:
-                Label("Offline: using saved catalogue from \(Platform.stockVerifiedDate)",
-                      systemImage: "wifi.slash")
-                    .foregroundStyle(.psAmber)
+                PSOfflineBanner(message: "Offline: using saved catalogue from \(Platform.stockVerifiedDate)")
             case .unknown:
                 Label("Checking live catalogue…", systemImage: "arrow.clockwise")
+                    .font(.psCaption)
                     .foregroundStyle(.psMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Color.psSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
-        .font(.psCaption)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Color.psSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var searchAndFilters: some View {
@@ -106,23 +164,8 @@ struct CatalogView: View {
                 )
                 .font(.psCaption)
             }
+            .accessibilityLabel(appState.sortByPriceAscending ? "Sort by price, low to high" : "Sort by price, high to low")
         }
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 24))
-                .foregroundStyle(.psMuted)
-            Text("No platforms match your search.")
-                .font(.psHeadline)
-            Text("Try a different name, or clear the available-only filter.")
-                .font(.psCaption)
-                .foregroundStyle(.psMuted)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
     }
 
     private var stockNote: some View {
