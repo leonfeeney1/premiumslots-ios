@@ -421,8 +421,7 @@ struct AdminAnalyticsResponse: Decodable {
             statusRows = zip(labels, data).map { AdminByStatusRow(status: $0, count: Int($1), revenue: nil) }
         }
         byStatus = statusRows
-        if let churnValue = try? container.decodeIfPresent(AdminChurn.self, forKey: .churn),
-           let churnValue {
+        if let churnValue = try? container.decodeIfPresent(AdminChurn.self, forKey: .churn) {
             churn = churnValue
         } else {
             let users = try container.decodeIfPresent([AdminGenericRow].self, forKey: .churn_users) ?? []
