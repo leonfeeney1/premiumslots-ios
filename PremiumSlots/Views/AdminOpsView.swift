@@ -237,8 +237,8 @@ struct AdminWaitlistView: View {
                     }
                     .psScreenPadding()
                 }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
         }
         .background(Color.psBackground)
         .navigationTitle("Waitlist")
@@ -484,8 +484,8 @@ struct AdminCommsView: View {
                     }
                     .psScreenPadding()
                 }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
         }
         .background(Color.psBackground)
         .navigationTitle("Comms")

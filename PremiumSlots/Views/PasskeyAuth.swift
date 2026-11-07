@@ -307,10 +307,10 @@ enum PasskeyWire {
     static func registrationPayload(
         _ credential: ASAuthorizationPlatformPublicKeyCredentialRegistration
     ) throws -> [String: Any] {
-        guard let attestationObject = credential.rawAttestationObject,
-              let clientData = credential.rawClientDataJSON else {
+        guard let attestationObject = credential.rawAttestationObject else {
             throw PasskeyError.missingData("the attestation data")
         }
+        let clientData = credential.rawClientDataJSON
         return [
             "id": credential.credentialID.passkeyBase64URL(),
             "rawId": credential.credentialID.passkeyBase64URL(),
@@ -329,10 +329,10 @@ enum PasskeyWire {
         _ credential: ASAuthorizationPlatformPublicKeyCredentialAssertion
     ) throws -> [String: Any] {
         guard let authenticatorData = credential.rawAuthenticatorData,
-              let clientData = credential.rawClientDataJSON,
               let signature = credential.signature else {
             throw PasskeyError.missingData("the assertion data")
         }
+        let clientData = credential.rawClientDataJSON
         var response: [String: Any] = [
             "clientDataJSON": clientData.passkeyBase64URL(),
             "authenticatorData": authenticatorData.passkeyBase64URL(),
